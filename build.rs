@@ -17,6 +17,12 @@ mod schema {
 }
 use schema::Ruleset;
 
+// The docs/cli.md help-block parser, shared with tests/cli-help.rs the same
+// way: one definition, included where needed.
+mod help_blocks {
+    include!("build/help_blocks.rs");
+}
+
 fn main() {
     let ruleset_path = Path::new("assets/ruleset.json");
     println!("cargo:rerun-if-changed={}", ruleset_path.display());
@@ -30,6 +36,7 @@ fn main() {
     let out_path = Path::new(&out_dir).join("ruleset.postcard");
     std::fs::write(&out_path, &bytes).expect("write ruleset.postcard");
 
+    emit_cli_help();
     emit_engine_fingerprint();
     install_git_hooks();
 }
@@ -149,6 +156,45 @@ fn warn_hooks(reason: &str) {
         reason
     };
     println!("cargo::warning=could not install the git hooks ({reason}); run make hooks");
+}
+
+/// Embed the `--help` texts from the marked blocks in docs/cli.md.
+///
+/// The docs are the single source: each `<!-- cli:<name> -->` block is
+/// exactly what the binary prints for that topic, so help output and
+/// documentation cannot drift apart.  A missing, extra, or malformed block
+/// fails the build rather than shipping wrong help.
+fn emit_cli_help() {
+    const TOPICS: [&str; 7] = ["global", "lint", "convert", "setup", "pack", "tm", "cache"];
+
+    println!("cargo:rerun-if-changed=docs/cli.md");
+    let md = std::fs::read_to_string("docs/cli.md").expect("read docs/cli.md");
+    let blocks =
+        help_blocks::extract_cli_blocks(&md).expect("extract help blocks from docs/cli.md");
+
+    for (name, _) in &blocks {
+        assert!(
+            TOPICS.contains(&name.as_str()),
+            "docs/cli.md has a cli:{name} block but there is no such help topic"
+        );
+    }
+    for topic in TOPICS {
+        assert!(
+            blocks.iter().any(|(name, _)| name == topic),
+            "docs/cli.md is missing the cli:{topic} block"
+        );
+    }
+
+    let mut src = String::new();
+    for (name, text) in &blocks {
+        src.push_str(&format!(
+            "pub const {}: &str = {:?};\n",
+            name.to_uppercase(),
+            text
+        ));
+    }
+    let out_dir = std::env::var("OUT_DIR").expect("OUT_DIR");
+    std::fs::write(Path::new(&out_dir).join("cli_help.rs"), src).expect("write cli_help.rs");
 }
 
 /// Hash the scanner sources into `ZHTW_ENGINE_FINGERPRINT`.

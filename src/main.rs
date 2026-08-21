@@ -6,7 +6,7 @@ use anyhow::{Context, Result};
 
 mod cli;
 
-use cli::args::{parse_args, Cli, Command, LintArgs};
+use cli::args::{help_text, parse_args, Cli, Command, LintArgs};
 use cli::lint::{content_type_for, run_lint_batch, LintBatchParams};
 
 /// Text failed a gate: too many errors or warnings.  The input was linted
@@ -54,6 +54,11 @@ fn run(cli: Cli) -> Result<()> {
     let packs_dir = packs_dir.unwrap_or_else(zhtw_mcp::rules::store::default_packs_dir);
 
     match command {
+        Command::Help(topic) => {
+            print!("{}", help_text(topic));
+            Ok(())
+        }
+
         // Setup subcommand: generate integration config for a host editor.
         Command::Setup(host) => {
             if host == "translation-guide" || host == "translation_guide" {

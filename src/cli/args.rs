@@ -9,6 +9,7 @@
 use anyhow::{Context, Result};
 use std::path::PathBuf;
 
+use crate::cli::help;
 use crate::cli::render::LintFormat;
 
 /// Refused the same way on both subcommands that accept `--verify`, so the
@@ -36,6 +37,33 @@ pub(crate) enum Command {
     Pack { cmd: String, arg: Option<String> },
     Tm(TmArgs),
     CacheClear,
+    Help(HelpTopic),
+}
+
+/// Which help message to print.  `--help`/`-h` anywhere after a subcommand
+/// selects that subcommand's topic; otherwise the global one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum HelpTopic {
+    Global,
+    Lint,
+    Convert,
+    Setup,
+    Pack,
+    Tm,
+    Cache,
+}
+
+/// The help message for a topic.
+pub(crate) fn help_text(topic: HelpTopic) -> &'static str {
+    match topic {
+        HelpTopic::Global => help::GLOBAL,
+        HelpTopic::Lint => help::LINT,
+        HelpTopic::Convert => help::CONVERT,
+        HelpTopic::Setup => help::SETUP,
+        HelpTopic::Pack => help::PACK,
+        HelpTopic::Tm => help::TM,
+        HelpTopic::Cache => help::CACHE,
+    }
 }
 
 /// Flags accepted after the `lint` subcommand.  Everything that is not a known
@@ -172,6 +200,15 @@ fn claim(current: &Command, name: &str) -> Result<()> {
     }
 }
 
+/// True when `--help` or `-h` appears anywhere in a subcommand's arguments.
+///
+/// Checked before the subcommand parser runs, so `lint --help` prints help even
+/// though the lint parser would otherwise require a file argument, and `pack
+/// --help` prints help instead of treating `--help` as a pack subcommand.
+fn wants_help(rest: &[String]) -> bool {
+    rest.iter().any(|a| a == "--help" || a == "-h")
+}
+
 /// Parse argv (including argv[0]) into a `Cli`.
 ///
 /// Pure: no filesystem, environment, or network access.  Defaults that need any
@@ -216,14 +253,26 @@ pub(crate) fn parse_args(args: &[String]) -> Result<Cli> {
                 i += 1;
                 cli.packs_dir = Some(path_value(args.get(i), "--packs-dir requires a path")?);
             }
+            "--help" | "-h" => {
+                cli.command = Command::Help(HelpTopic::Global);
+                return Ok(cli);
+            }
             "lint" => {
                 claim(&cli.command, "lint")?;
+                if wants_help(&args[i + 1..]) {
+                    cli.command = Command::Help(HelpTopic::Lint);
+                    return Ok(cli);
+                }
                 let (lint, used) = parse_lint(&args[i + 1..])?;
                 i += used;
                 cli.command = Command::Lint(Box::new(lint));
             }
             "setup" => {
                 claim(&cli.command, "setup")?;
+                if wants_help(&args[i + 1..]) {
+                    cli.command = Command::Help(HelpTopic::Setup);
+                    return Ok(cli);
+                }
                 i += 1;
                 cli.command = Command::Setup(
                     args.get(i)
@@ -233,24 +282,40 @@ pub(crate) fn parse_args(args: &[String]) -> Result<Cli> {
             }
             "convert" => {
                 claim(&cli.command, "convert")?;
+                if wants_help(&args[i + 1..]) {
+                    cli.command = Command::Help(HelpTopic::Convert);
+                    return Ok(cli);
+                }
                 let (convert, used) = parse_convert(&args[i + 1..])?;
                 i += used;
                 cli.command = Command::Convert(convert);
             }
             "tm" => {
                 claim(&cli.command, "tm")?;
+                if wants_help(&args[i + 1..]) {
+                    cli.command = Command::Help(HelpTopic::Tm);
+                    return Ok(cli);
+                }
                 let (tm, used) = parse_tm(&args[i + 1..])?;
                 i += used;
                 cli.command = Command::Tm(tm);
             }
             "pack" => {
                 claim(&cli.command, "pack")?;
+                if wants_help(&args[i + 1..]) {
+                    cli.command = Command::Help(HelpTopic::Pack);
+                    return Ok(cli);
+                }
                 let (cmd, arg, used) = parse_pack(&args[i + 1..])?;
                 i += used;
                 cli.command = Command::Pack { cmd, arg };
             }
             "cache" => {
                 claim(&cli.command, "cache")?;
+                if wants_help(&args[i + 1..]) {
+                    cli.command = Command::Help(HelpTopic::Cache);
+                    return Ok(cli);
+                }
                 i += parse_cache(&args[i + 1..])?;
                 cli.command = Command::CacheClear;
             }
