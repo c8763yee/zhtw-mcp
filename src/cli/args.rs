@@ -209,6 +209,27 @@ fn wants_help(rest: &[String]) -> bool {
     rest.iter().any(|a| a == "--help" || a == "-h")
 }
 
+/// Subcommand name to help topic.  The `--help` check reads this table once at
+/// the top of the parse loop; adding a row is the whole of wiring help up for a
+/// new subcommand, and the docs cross-check in `build.rs` covers the topic.
+const SUBCOMMAND_TOPICS: [(&str, HelpTopic); 6] = [
+    ("lint", HelpTopic::Lint),
+    ("convert", HelpTopic::Convert),
+    ("setup", HelpTopic::Setup),
+    ("pack", HelpTopic::Pack),
+    ("tm", HelpTopic::Tm),
+    ("cache", HelpTopic::Cache),
+];
+
+/// The topic `rest` selects when it opens with a subcommand whose arguments ask
+/// for help, and None otherwise.
+fn subcommand_help(rest: &[String]) -> Option<HelpTopic> {
+    let (_, topic) = SUBCOMMAND_TOPICS
+        .iter()
+        .find(|(name, _)| *name == rest[0])?;
+    wants_help(&rest[1..]).then_some(*topic)
+}
+
 /// Parse argv (including argv[0]) into a `Cli`.
 ///
 /// Pure: no filesystem, environment, or network access.  Defaults that need any
@@ -239,6 +260,10 @@ pub(crate) fn parse_args(args: &[String]) -> Result<Cli> {
     let mut i = 1;
 
     while i < args.len() {
+        if let Some(topic) = subcommand_help(&args[i..]) {
+            cli.command = Command::Help(topic);
+            return Ok(cli);
+        }
         match args[i].as_str() {
             "--overrides" | "--db" => {
                 i += 1;
@@ -259,20 +284,12 @@ pub(crate) fn parse_args(args: &[String]) -> Result<Cli> {
             }
             "lint" => {
                 claim(&cli.command, "lint")?;
-                if wants_help(&args[i + 1..]) {
-                    cli.command = Command::Help(HelpTopic::Lint);
-                    return Ok(cli);
-                }
                 let (lint, used) = parse_lint(&args[i + 1..])?;
                 i += used;
                 cli.command = Command::Lint(Box::new(lint));
             }
             "setup" => {
                 claim(&cli.command, "setup")?;
-                if wants_help(&args[i + 1..]) {
-                    cli.command = Command::Help(HelpTopic::Setup);
-                    return Ok(cli);
-                }
                 i += 1;
                 cli.command = Command::Setup(
                     args.get(i)
@@ -282,40 +299,24 @@ pub(crate) fn parse_args(args: &[String]) -> Result<Cli> {
             }
             "convert" => {
                 claim(&cli.command, "convert")?;
-                if wants_help(&args[i + 1..]) {
-                    cli.command = Command::Help(HelpTopic::Convert);
-                    return Ok(cli);
-                }
                 let (convert, used) = parse_convert(&args[i + 1..])?;
                 i += used;
                 cli.command = Command::Convert(convert);
             }
             "tm" => {
                 claim(&cli.command, "tm")?;
-                if wants_help(&args[i + 1..]) {
-                    cli.command = Command::Help(HelpTopic::Tm);
-                    return Ok(cli);
-                }
                 let (tm, used) = parse_tm(&args[i + 1..])?;
                 i += used;
                 cli.command = Command::Tm(tm);
             }
             "pack" => {
                 claim(&cli.command, "pack")?;
-                if wants_help(&args[i + 1..]) {
-                    cli.command = Command::Help(HelpTopic::Pack);
-                    return Ok(cli);
-                }
                 let (cmd, arg, used) = parse_pack(&args[i + 1..])?;
                 i += used;
                 cli.command = Command::Pack { cmd, arg };
             }
             "cache" => {
                 claim(&cli.command, "cache")?;
-                if wants_help(&args[i + 1..]) {
-                    cli.command = Command::Help(HelpTopic::Cache);
-                    return Ok(cli);
-                }
                 i += parse_cache(&args[i + 1..])?;
                 cli.command = Command::CacheClear;
             }
