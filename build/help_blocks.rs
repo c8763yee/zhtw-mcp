@@ -30,7 +30,7 @@ pub fn extract_cli_blocks(md: &str) -> Result<Vec<(String, String)>, String> {
                 Some((name, Vec::new()))
             }
             (true, Some((opened, lines))) => {
-                let text = block_text(&opened, lines)?;
+                let text = block_text(&opened, &lines)?;
                 blocks.push((opened, text));
                 None
             }
@@ -56,24 +56,21 @@ fn marker_name(line: &str) -> Option<String> {
     Some(inner.to_owned())
 }
 
-/// Turn a block's lines into help text: drop surrounding blank lines, strip
-/// the optional code fence, and end with the newline `print!` relies on.
-fn block_text(name: &str, mut lines: Vec<&str>) -> Result<String, String> {
-    while lines.first().is_some_and(|l| l.trim().is_empty()) {
-        lines.remove(0);
+/// Turn a block's lines into help text: strip the optional code fence, drop
+/// the blank lines around it and inside it, and end with the newline
+/// `print!` relies on.
+fn block_text(name: &str, lines: &[&str]) -> Result<String, String> {
+    let joined = lines.join("\n");
+    let mut body = joined.trim();
+    if let Some(rest) = body.strip_prefix("```") {
+        body = rest
+            .split_once('\n')
+            .and_then(|(_, inner)| inner.trim_end().strip_suffix("```"))
+            .ok_or_else(|| format!("cli:{name} block's code fence never closes"))?
+            .trim();
     }
-    while lines.last().is_some_and(|l| l.trim().is_empty()) {
-        lines.pop();
-    }
-    if lines.first().is_some_and(|l| l.starts_with("```")) {
-        if lines.len() < 2 || !lines.last().is_some_and(|l| l.trim() == "```") {
-            return Err(format!("cli:{name} block's code fence never closes"));
-        }
-        lines.remove(0);
-        lines.pop();
-    }
-    if lines.is_empty() {
+    if body.is_empty() {
         return Err(format!("cli:{name} block is empty"));
     }
-    Ok(lines.join("\n") + "\n")
+    Ok(format!("{body}\n"))
 }

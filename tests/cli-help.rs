@@ -70,9 +70,21 @@ fn extracts_blocks_in_document_order() {
 
 #[test]
 fn strips_the_code_fence_and_surrounding_blank_lines() {
-    let md = "<!-- cli:a -->\n\n```text\nbody\n```\n\n<!-- cli:end -->\n";
+    // Blank lines on both sides of the fence: the ones outside it and the
+    // ones just inside it are equally not part of the help text.
+    let md = "<!-- cli:a -->\n\n```text\n\nbody\n\n```\n\n<!-- cli:end -->\n";
     let blocks = extract_cli_blocks(md).unwrap();
     assert_eq!(blocks, vec![("a".to_owned(), "body\n".to_owned())]);
+}
+
+#[test]
+fn fenced_and_unfenced_blocks_end_in_one_newline() {
+    let fenced = "<!-- cli:a -->\n```text\nbody\n\n```\n<!-- cli:end -->\n";
+    let bare = "<!-- cli:a -->\nbody\n<!-- cli:end -->\n";
+    assert_eq!(
+        extract_cli_blocks(fenced).unwrap(),
+        extract_cli_blocks(bare).unwrap()
+    );
 }
 
 #[test]
