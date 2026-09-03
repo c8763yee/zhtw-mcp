@@ -9,9 +9,8 @@
 
 use std::process::{Command, Output, Stdio};
 
-mod help_blocks {
-    include!("../build/help_blocks.rs");
-}
+#[path = "../build/help_blocks.rs"]
+mod help_blocks;
 use help_blocks::extract_cli_blocks;
 
 fn binary_path() -> std::path::PathBuf {
