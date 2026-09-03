@@ -200,15 +200,6 @@ fn claim(current: &Command, name: &str) -> Result<()> {
     }
 }
 
-/// True when `--help` or `-h` appears anywhere in a subcommand's arguments.
-///
-/// Checked before the subcommand parser runs, so `lint --help` prints help even
-/// though the lint parser would otherwise require a file argument, and `pack
-/// --help` prints help instead of treating `--help` as a pack subcommand.
-fn wants_help(rest: &[String]) -> bool {
-    rest.iter().any(|a| a == "--help" || a == "-h")
-}
-
 /// Subcommand name to help topic.  The `--help` check reads this table once at
 /// the top of the parse loop; adding a row is the whole of wiring help up for a
 /// new subcommand, and the docs cross-check in `build.rs` covers the topic.
@@ -221,13 +212,24 @@ const SUBCOMMAND_TOPICS: [(&str, HelpTopic); 6] = [
     ("cache", HelpTopic::Cache),
 ];
 
-/// The topic `rest` selects when it opens with a subcommand whose arguments ask
-/// for help, and None otherwise.
-fn subcommand_help(rest: &[String]) -> Option<HelpTopic> {
-    let (_, topic) = SUBCOMMAND_TOPICS
+/// Return the help topic from the subcommand name, or `Global` if no subcommand is present.
+fn help_topic(args: &[String]) -> Option<HelpTopic> {
+    let contain_flag = args.iter().any(|a| a == "--help" || a == "-h");
+    if !contain_flag {
+        return None;
+    }
+
+    let topic = args
         .iter()
-        .find(|(name, _)| *name == rest[0])?;
-    wants_help(&rest[1..]).then_some(*topic)
+        .find_map(|arg| {
+            SUBCOMMAND_TOPICS
+                .iter()
+                .find(|(name, _)| *name == arg)
+                .map(|(_, topic)| *topic)
+        })
+        .unwrap_or(HelpTopic::Global);
+
+    Some(topic)
 }
 
 /// Parse argv (including argv[0]) into a `Cli`.
@@ -257,13 +259,13 @@ pub(crate) fn parse_args(args: &[String]) -> Result<Cli> {
         config_path: None,
         command: Command::Server,
     };
+    if let Some(topic) = help_topic(&args[1..]) {
+        cli.command = Command::Help(topic);
+        return Ok(cli);
+    }
     let mut i = 1;
 
     while i < args.len() {
-        if let Some(topic) = subcommand_help(&args[i..]) {
-            cli.command = Command::Help(topic);
-            return Ok(cli);
-        }
         match args[i].as_str() {
             "--overrides" | "--db" => {
                 i += 1;
@@ -278,10 +280,7 @@ pub(crate) fn parse_args(args: &[String]) -> Result<Cli> {
                 i += 1;
                 cli.packs_dir = Some(path_value(args.get(i), "--packs-dir requires a path")?);
             }
-            "--help" | "-h" => {
-                cli.command = Command::Help(HelpTopic::Global);
-                return Ok(cli);
-            }
+
             "lint" => {
                 claim(&cli.command, "lint")?;
                 let (lint, used) = parse_lint(&args[i + 1..])?;
@@ -1132,5 +1131,81 @@ mod tests {
             parse(&["--verbose", "--debug"]).unwrap().command,
             Command::Server
         ));
+    }
+
+    /// The topic `argv` asks for, or a panic if it does not ask for help.
+    fn help_of(argv: &[&str]) -> HelpTopic {
+        match parse(argv).expect("parse should succeed").command {
+            Command::Help(topic) => topic,
+            _ => panic!("expected a help command from {argv:?}"),
+        }
+    }
+
+    fn asks_for_help(argv: &[&str]) -> bool {
+        matches!(
+            parse(argv).expect("parse should succeed").command,
+            Command::Help(_)
+        )
+    }
+
+    #[test]
+    fn a_line_without_a_help_flag_never_prints_help() {
+        assert!(!asks_for_help(&[]));
+        assert!(!asks_for_help(&["lint", "a.md"]));
+        assert!(!asks_for_help(&["--pack", "medical", "lint", "a.md"]));
+        assert!(!asks_for_help(&["tm", "list"]));
+        // "help" is a word, not a flag, and no subcommand is spelled that way.
+        assert!(err_of(&["help"]).contains("unknown argument"));
+    }
+
+    #[test]
+    fn a_help_flag_with_no_subcommand_selects_the_global_topic() {
+        assert_eq!(help_of(&["--help"]), HelpTopic::Global);
+        assert_eq!(help_of(&["-h"]), HelpTopic::Global);
+        assert_eq!(help_of(&["--pack", "medical", "--help"]), HelpTopic::Global);
+        // A help flag outranks an argument that would otherwise be rejected.
+        assert_eq!(help_of(&["--nope", "--help"]), HelpTopic::Global);
+    }
+
+    #[test]
+    fn a_help_flag_after_a_subcommand_selects_that_subcommand() {
+        for (name, topic) in SUBCOMMAND_TOPICS {
+            assert_eq!(help_of(&[name, "--help"]), topic, "{name}");
+            assert_eq!(help_of(&[name, "-h"]), topic, "{name}");
+        }
+        assert_eq!(help_of(&["lint", "a.md", "--help"]), HelpTopic::Lint);
+        assert_eq!(help_of(&["setup", "vscode", "--help"]), HelpTopic::Setup);
+        // A help flag in a value slot is still a request for help: it outranks
+        // the rest of the line rather than being recorded as the value.
+        assert_eq!(help_of(&["lint", "--format", "--help"]), HelpTopic::Lint);
+        assert_eq!(
+            help_of(&["tm", "record", "--found", "a", "--context", "-h"]),
+            HelpTopic::Tm
+        );
+    }
+
+    #[test]
+    fn a_subcommand_topic_outranks_the_global_one() {
+        assert_eq!(help_of(&["--help", "lint", "--help"]), HelpTopic::Lint);
+        assert_eq!(help_of(&["-h", "convert", "-h"]), HelpTopic::Convert);
+        assert_eq!(
+            help_of(&["--pack", "medical", "--help", "tm", "--help"]),
+            HelpTopic::Tm
+        );
+        // The subcommand need not carry a help flag of its own.
+        assert_eq!(help_of(&["--help", "pack"]), HelpTopic::Pack);
+    }
+
+    #[test]
+    fn a_subcommand_name_in_a_global_value_slot_still_picks_the_topic() {
+        // The scan for a topic does not know which arguments are values, so a
+        // directory or pack literally named after a subcommand selects that
+        // subcommand's help.  Only a global value slot can do this: it is the
+        // only slot ahead of the subcommand, so once the real one appears it
+        // is the first match.  The cost is the wrong help page on a line that
+        // asked for help either way, which is not worth a second table of
+        // value-taking flags to keep in sync with the match arms above.
+        assert_eq!(help_of(&["--packs-dir", "lint", "--help"]), HelpTopic::Lint);
+        assert_eq!(help_of(&["--config", "tm", "--help"]), HelpTopic::Tm);
     }
 }
