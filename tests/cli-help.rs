@@ -81,6 +81,17 @@ fn fenced_and_unfenced_blocks_end_in_one_newline() {
 }
 
 #[test]
+fn a_longer_closing_fence_strips_whole() {
+    // Four backticks open and close: the old positional strip took three off
+    // each end and left the fourth in the help text.
+    let md = "<!-- cli:a -->\n````text\nbody\n````\n<!-- cli:end -->\n";
+    assert_eq!(
+        extract_cli_blocks(md).unwrap(),
+        vec![("a".to_owned(), "body\n".to_owned())]
+    );
+}
+
+#[test]
 fn malformed_blocks_are_errors() {
     for (md, expected) in [
         ("<!-- cli:a -->\nbody\n", "cli:a block never closed"),
@@ -100,6 +111,32 @@ fn malformed_blocks_are_errors() {
         (
             "<!-- cli:a -->\n\n<!-- cli:end -->\n",
             "cli:a block is empty",
+        ),
+        // Every shape below used to build clean and ship a literal backtick
+        // into the terminal, because the fence was stripped by position: a
+        // leading run of backticks, then whatever run came last.
+        (
+            "<!-- cli:a -->\nprose\n\n```text\nbody\n```\n<!-- cli:end -->\n",
+            "cli:a block's code fence must wrap the whole block",
+        ),
+        (
+            "<!-- cli:a -->\n```text\nrun this:\n```bash\nzhtw-mcp lint\n```\n```\n<!-- cli:end -->\n",
+            "cli:a block has a second code fence inside it",
+        ),
+        (
+            "<!-- cli:a -->\n```text\npart1\n```\n\n```text\npart2\n```\n<!-- cli:end -->\n",
+            "cli:a block has a second code fence inside it",
+        ),
+        // The fence closed; the prose after it is the line to go and look at,
+        // which is not what a "never closes" message would have said.
+        (
+            "<!-- cli:a -->\n```text\nbody\n```\ntrailing\n<!-- cli:end -->\n",
+            "cli:a block has content after its code fence",
+        ),
+        // An info string is an opener, so this one never closes.
+        (
+            "<!-- cli:a -->\n```text\nbody\n```text\n<!-- cli:end -->\n",
+            "cli:a block's code fence never closes",
         ),
     ] {
         assert_eq!(

@@ -59,18 +59,70 @@ fn marker_name(line: &str) -> Option<String> {
 /// Turn a block's lines into help text: strip the optional code fence, drop
 /// the blank lines around it and inside it, and end with the newline
 /// `print!` relies on.
+///
+/// The fence is matched as a structure rather than by position.  Stripping a
+/// leading run of backticks and then a trailing one lets an opening fence be
+/// closed by whatever backticks happen to come last, so a block with prose
+/// above its fence, a sample fence inside it, or two fenced sections in it all
+/// built clean and shipped literal backticks to the terminal.  The guarantee
+/// this file exists for is that the docs and the help text are the same text,
+/// and only the whole fence pair can carry it.
 fn block_text(name: &str, lines: &[&str]) -> Result<String, String> {
-    let joined = lines.join("\n");
-    let mut body = joined.trim();
-    if let Some(rest) = body.strip_prefix("```") {
-        body = rest
-            .split_once('\n')
-            .and_then(|(_, inner)| inner.trim_end().strip_suffix("```"))
-            .ok_or_else(|| format!("cli:{name} block's code fence never closes"))?
-            .trim();
+    let mut body = trim_blank_lines(lines);
+    let fenced = body.first().and_then(|line| fence_ticks(line));
+
+    if let Some(ticks) = fenced {
+        let (last, inner) = body[1..]
+            .split_last()
+            .ok_or_else(|| format!("cli:{name} block's code fence never closes"))?;
+        if !closes_fence(last, ticks) {
+            // A closer in the middle means the fence did close and something
+            // follows it, which is a different line to go and look at.
+            return Err(if inner.iter().any(|line| closes_fence(line, ticks)) {
+                format!("cli:{name} block has content after its code fence")
+            } else {
+                format!("cli:{name} block's code fence never closes")
+            });
+        }
+        body = trim_blank_lines(inner);
     }
-    if body.is_empty() {
+
+    if body.iter().any(|line| fence_ticks(line).is_some()) {
+        return Err(match fenced {
+            Some(_) => format!("cli:{name} block has a second code fence inside it"),
+            None => format!("cli:{name} block's code fence must wrap the whole block"),
+        });
+    }
+
+    let joined = body.join("\n");
+    let text = joined.trim();
+    if text.is_empty() {
         return Err(format!("cli:{name} block is empty"));
     }
-    Ok(format!("{body}\n"))
+    Ok(format!("{text}\n"))
+}
+
+/// The backtick count of a code fence line, or `None` when the line is not one.
+fn fence_ticks(line: &str) -> Option<usize> {
+    let ticks = line.trim_start().chars().take_while(|c| *c == '`').count();
+    (ticks >= 3).then_some(ticks)
+}
+
+/// A closing fence carries no info string and is no shorter than its opener.
+fn closes_fence(line: &str, opener: usize) -> bool {
+    let trimmed = line.trim();
+    trimmed.len() >= opener && trimmed.chars().all(|c| c == '`')
+}
+
+/// The slice without the blank lines at either end.
+fn trim_blank_lines<'a>(lines: &'a [&'a str]) -> &'a [&'a str] {
+    let start = lines
+        .iter()
+        .position(|line| !line.trim().is_empty())
+        .unwrap_or(lines.len());
+    let end = lines
+        .iter()
+        .rposition(|line| !line.trim().is_empty())
+        .map_or(start, |i| i + 1);
+    &lines[start..end]
 }
