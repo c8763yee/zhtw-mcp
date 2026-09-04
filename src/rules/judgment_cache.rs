@@ -288,7 +288,7 @@ impl JudgmentCache {
         // Cleared on the attempt, not on success. A store that cannot be
         // written, a read-only config directory being the usual reason, would
         // otherwise re-serialize and re-fail on every later call in the
-        // process. `dirty` stays set, so `Drop` still retries once.
+        // process. dirty stays set, so Drop still retries once.
         self.judged = false;
         self.flush();
     }

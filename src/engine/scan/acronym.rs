@@ -1,9 +1,9 @@
 // Spaced-acronym rejoining for ASR transcripts.
 //
-// Detects sequences of single uppercase ASCII letters separated by spaces
-// (e.g. "C P U", "F P G A") and suggests the joined form ("CPU", "FPGA").
-// Only flags sequences of 2+ letters that form a known acronym or any
-// sequence of 3+ letters (high confidence that spacing is an ASR artifact).
+// Detects sequences of single uppercase ASCII letters separated by spaces (e.g.
+// "C P U", "F P G A") and suggests the joined form ("CPU", "FPGA"). Only flags
+// sequences of 2+ letters that form a known acronym or any sequence of 3+
+// letters (high confidence that spacing is an ASR artifact).
 
 use super::super::excluded::{is_excluded, ByteRange};
 use crate::rules::ruleset::{Issue, IssueType, Severity};

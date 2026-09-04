@@ -1,7 +1,7 @@
 // Overlap resolution for detected issues.
 //
-// Priority-based greedy algorithm: longest match wins; on tie, higher
-// severity wins.  Avoids the ghost-suppression flaw in forward greedy scans.
+// Priority-based greedy algorithm: longest match wins; on tie, higher severity
+// wins. Avoids the ghost-suppression flaw in forward greedy scans.
 
 use crate::rules::ruleset::Issue;
 
@@ -12,7 +12,7 @@ use crate::rules::ruleset::Issue;
 /// Uses a priority-based greedy algorithm: issues are processed longest-first,
 /// accepted only when non-overlapping with all already-accepted matches.
 /// This avoids the ghost-suppression flaw in a forward greedy scan, where A
-/// can be wrongly discarded because B beats A and then C beats B — even though
+/// can be wrongly discarded because B beats A and then C beats B: even though
 /// A and C would not have overlapped.
 #[allow(dead_code)] // scanner uses the _with_scratch form; this one is read by tests
 pub(crate) fn resolve_overlaps(issues: &mut Vec<Issue>) {
@@ -33,8 +33,8 @@ pub(crate) fn resolve_overlaps_with_scratch(
         return;
     }
 
-    // Process in priority order: longest first; on tie, highest severity;
-    // on further tie, earliest offset (deterministic).
+    // Process in priority order: longest first; on tie, highest severity; on
+    // further tie, earliest offset (deterministic).
     let n = issues.len();
 
     order.clear();
@@ -50,16 +50,16 @@ pub(crate) fn resolve_overlaps_with_scratch(
     keep.clear();
     keep.resize(n, false);
 
-    // Accepted byte intervals (start, end), kept sorted by start offset
-    // for O(log n) overlap checks via binary search.
+    // Accepted byte intervals (start, end), kept sorted by start offset for
+    // O(log n) overlap checks via binary search.
     accepted.clear();
 
     for &i in order.iter() {
         let start = issues[i].offset;
         let end = start.saturating_add(issues[i].length);
 
-        // Binary search for the insertion point, then check neighbors.
-        // Two intervals [s1,e1) and [s2,e2) overlap iff s1 < e2 && e1 > s2.
+        // Binary search for the insertion point, then check neighbors. Two
+        // intervals [s1,e1) and [s2,e2) overlap iff s1 < e2 && e1 > s2.
         let pos = accepted.partition_point(|&(s, _)| s < start);
         let overlaps =
             // Check the interval just before (if it extends past our start).

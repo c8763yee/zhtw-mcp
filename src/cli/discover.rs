@@ -21,8 +21,8 @@ pub(crate) fn resolve_diff_files(git_ref: &str) -> Result<Vec<String>> {
     );
 
     // Everything git-check-ref-format permits, minus the shell-ish characters
-    // no ref needs. `+` belongs here: a branch may legitimately be named
-    // `feature/foo+bar`, and rejecting it turned a valid ref into an error.
+    // no ref needs. "+" belongs here: a branch may legitimately be named
+    // "feature/foo+bar", and rejecting it turned a valid ref into an error.
     anyhow::ensure!(
         git_ref
             .chars()
@@ -89,7 +89,7 @@ pub(crate) fn resolve_file_args(args: &[String], exclude: &[String]) -> Result<V
 
     for arg in args {
         if arg == "--" {
-            // stdin sentinel — pass through as-is.
+            // stdin sentinel: pass through as-is.
             files.insert("--".to_string());
             continue;
         }
@@ -207,17 +207,16 @@ pub(crate) fn normalize_path(path: &Path) -> String {
 /// Check if a file path matches any --exclude pattern.
 ///
 /// Supported patterns:
-/// - *.ext — match files with the given extension
-/// - dir/** — match anything under the given directory component
+/// - *.ext: match files with the given extension
+/// - dir/**: match anything under the given directory component
 /// - Literal path-component match as a fallback
 fn path_excluded(path: &str, patterns: &[String]) -> bool {
-    // Patterns are always written with `/` (`vendor/**`, doc comment above),
-    // but `path` carries the OS separator; on Windows that's `\`, so every
-    // `/`-delimited comparison below missed every match. Normalize once
-    // rather than teach each branch two separators. Restricted to Windows:
-    // on Unix `\` is a legal filename byte, not a separator, so rewriting
-    // it there would misparse a literal backslash in a filename as a
-    // directory boundary.
+    // Patterns are always written with "/" (vendor/**, doc comment above), but
+    // path carries the OS separator; on Windows that's "\", so every
+    // "/"-delimited comparison below missed every match. Normalize once rather
+    // than teach each branch two separators. Restricted to Windows: on Unix "\"
+    // is a legal filename byte, not a separator, so rewriting it there would
+    // misparse a literal backslash in a filename as a directory boundary.
     let normalized_path = if cfg!(windows) {
         path.replace('\\', "/")
     } else {

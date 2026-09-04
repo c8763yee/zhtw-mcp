@@ -71,6 +71,10 @@ fs2 = { version = "0.4", optional = true }
 postcard = { version = "1", default-features = false, features = ["alloc"] }
 console_error_panic_hook = { version = "0.1", optional = true }
 wasm-bindgen = { version = "0.2", optional = true }
+# Pinned to a major on purpose. SEP-2577 removes the sampling and logging
+# capabilities this server still serves, and the release that drops them will
+# not be a 3.x, so the next major bump is the moment to revisit the six
+# deprecation allows in src/mcp/sdk.rs rather than to silence them again.
 rmcp = { version = "3", default-features = false, features = [
     "server",
     "transport-io",

@@ -1,6 +1,6 @@
 // MMSEG word segmenter.
 //
-// Scope: word boundaries only — NOT a full Chinese NLP toolkit. No POS tagging,
+// Scope: word boundaries only, NOT a full Chinese NLP toolkit. No POS tagging,
 // no parsing. Designed for heuristic analysis in dunhao detection dunhao
 // detection, ambiguity resolution, and variant context awareness.
 //
@@ -23,7 +23,7 @@ use std::collections::HashSet;
 
 use rustc_hash::FxHashMap;
 
-// CharTrie — character-indexed trie for O(L) dict lookups
+// CharTrie: character-indexed trie for O(L) dict lookups
 
 /// A node in the character trie.  Each node optionally stores a freq weight
 /// (non-zero = terminal) and a map from the next character to child nodes.
@@ -222,7 +222,7 @@ pub struct Segmenter {
     /// Invariant: max_word_len <= MAX_WORD_LEN_LIMIT (enforced at
     /// construction).
     max_word_len: usize,
-    /// Rule 'from' terms — cn-style patterns that the AC scanner is trying
+    /// Rule 'from' terms: cn-style patterns that the AC scanner is trying
     /// to detect.  Excluded from word-boundary straddle checks so that one
     /// rule's pattern doesn't suppress another rule's match.
     /// The trie also carries `is_rule_from` per-node for hot-path lookups;
@@ -387,7 +387,7 @@ impl Segmenter {
 
         // General vocabulary gets freq=5 (between rule terms and stop words).
         // Use insert_if_absent: don't overwrite rule terms (freq=1) that are
-        // already present — preserves the original or_insert semantics.
+        // already present: preserves the original or_insert semantics.
         for w in GENERAL_VOCAB {
             if trie.insert_if_absent(w, 5, &mut max_word_len) {
                 word_count += 1;
@@ -584,7 +584,7 @@ impl Segmenter {
     ///
     /// Returns `true` if there exists a dictionary entry of length >= 2 chars
     /// that starts before `boundary` and ends after it.  This catches false
-    /// AC matches where the pattern spans two distinct words — e.g. "積分"
+    /// AC matches where the pattern spans two distinct words: e.g. "積分"
     /// inside "累積分佈" (累積 + 分佈).
     ///
     /// Rule 'from' terms are excluded: they are cn-style patterns, not
@@ -604,7 +604,7 @@ impl Segmenter {
     /// the *end* boundary of a match, pass `Some(match_start)` as
     /// `no_walk_after`
     /// so that dictionary words beginning inside the match (e.g. "目的"
-    /// overlapping the end of "項目") are ignored — they represent a
+    /// overlapping the end of "項目") are ignored: they represent a
     /// different segmentation, not a boundary violation.
     ///
     /// Pass `None` to disable the limit (equivalent to
@@ -756,7 +756,7 @@ impl Segmenter {
             }
             pos = text.floor_char_boundary(pos - 1);
 
-            // Skip start positions strictly inside the match span — words
+            // Skip start positions strictly inside the match span: words
             // starting there are not external boundary violations. Still
             // consider a candidate that starts exactly at the match start,
             // because a longer dictionary word may extend past the right edge.
@@ -765,7 +765,14 @@ impl Segmenter {
                     continue;
                 }
             }
-            let ch = text[pos..].chars().next().unwrap();
+
+            // pos is strictly below the boundary by the walk above, so the
+            // slice is non-empty. Spelled as a match rather than an unwrap so
+            // the invariant is checked where it is relied on, the way the probe
+            // loop below tests bpos against the length.
+            let Some(ch) = text[pos..].chars().next() else {
+                break;
+            };
             if !is_cjk_ideograph(ch) {
                 break;
             }
@@ -1247,7 +1254,7 @@ mod tests {
 
     /// Clue absorption: MMSEG improves recall for cases where Rule 1 already
     /// disambiguates in favour of the segmentation that exposes the clue word.
-    /// "研究生命科學" — "研究" (the clue) surfaces as a standalone token.
+    /// "研究生命科學": "研究" (the clue) surfaces as a standalone token.
     #[test]
     fn mmseg_clue_surfaces_when_rule1_wins() {
         let seg = Segmenter::new(
@@ -1294,7 +1301,7 @@ mod tests {
         // "ABAB": dict has "AB"(2) and "A"(1-OOV), "B"(1-OOV). Two possible
         // 2-word chunks starting at pos 0:
         //   ["AB"(2), "AB"(2)] total=4, avg=2, var=0
-        //   ["A"(1), "B"(1), "AB"(2)] — but this is 3-word chunk; total=4, avg=4/3
+        //   ["A"(1), "B"(1), "AB"(2)]: but this is 3-word chunk; total=4, avg=4/3
         // Rule 2: ["AB","AB"] (2 words) wins over 3-word chunk → "AB" as first
         // token.
         let seg = Segmenter::new(["AB"].iter().map(|s| s.to_string()));

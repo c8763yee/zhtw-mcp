@@ -85,7 +85,7 @@ pub struct ProfileConfig {
     pub grammar_checks: bool,
     /// Enable AI filler phrase detection (值得注意的是, 在這種情況下, etc.).
     pub ai_filler_detection: bool,
-    /// Enable translationese (翻譯腔 / 歐化) detection — lexical patterns
+    /// Enable translationese (翻譯腔 / 歐化) detection: lexical patterns
     /// from the dewesternise checklist.  Orthogonal to `ai_filler_detection`:
     /// a translated manual is 歐化 but not AI-generated.
     pub translationese_detection: bool,
@@ -118,7 +118,7 @@ pub struct ProfileConfig {
     /// Used by MCP tool which consumes offsets directly.
     pub offset_only: bool,
     /// When true (Markdown content only), exclude pulldown-cmark
-    /// `Tag::BlockQuote` ranges from scanning.  Off by default — adopted
+    /// `Tag::BlockQuote` ranges from scanning.  Off by default, adopted
     /// blockquote prose is real content.  Opt-in via `--exempt-blockquotes`
     /// or `[markdown] exempt_blockquotes = true`.
     pub exempt_blockquotes: bool,
@@ -333,7 +333,7 @@ pub enum Tier2Outcome {
     Resolved,
     /// Suppressed by Tier 2 (score below ambiguous threshold).
     Suppressed,
-    /// Gray zone — forwarded to Tier 3 for LLM judgment.
+    /// Gray zone: forwarded to Tier 3 for LLM judgment.
     GrayZone,
 }
 
@@ -342,7 +342,7 @@ pub enum Tier2Outcome {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ResolutionTier {
-    /// Pure rule match — no disambiguation needed (punctuation, case,
+    /// Pure rule match: no disambiguation needed (punctuation, case,
     /// variant, grammar, unambiguous spelling).
     Deterministic,
     /// Resolved by Tier 2 local heuristics (context clues, profile
@@ -577,7 +577,7 @@ pub struct Issue {
     /// The matched (wrong) text.
     pub found: String,
     /// Suggested replacements.  Arc avoids per-issue allocation during
-    /// inflate — most issues share suggestions with their source rule.
+    /// inflate: most issues share suggestions with their source rule.
     pub suggestions: Arc<[String]>,
     /// Manual rewrite hint for a style rewrite. AI-style hints are present
     /// only for one determined non-empty replacement; competing alternatives
@@ -595,7 +595,7 @@ pub struct Issue {
     /// Arc-interned during inflation to avoid per-issue String clones.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub context: Option<Arc<str>>,
-    /// English original term — unambiguous anchor for cross-strait terms.
+    /// English original term: unambiguous anchor for cross-strait terms.
     /// Arc-interned during inflation to avoid per-issue String clones.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub english: Option<Arc<str>>,
@@ -617,7 +617,7 @@ pub struct Issue {
     pub glossary_banned: bool,
     /// Tier 2 disambiguation outcome.  Set by `disambiguate_batch` to
     /// indicate whether the issue was resolved locally, suppressed, or
-    /// left in the gray zone for Tier 3.  Internal — not serialized.
+    /// left in the gray zone for Tier 3.  Internal: not serialized.
     #[serde(skip)]
     pub tier2_outcome: Tier2Outcome,
     /// Which translationese detector produced this, and which pass it ran in.
@@ -734,7 +734,7 @@ impl Issue {
 
     /// Lightweight constructor for deferred spelling issues.
     ///
-    /// Skips the `found` and `suggestions` allocations — those are filled
+    /// Skips the `found` and `suggestions` allocations: those are filled
     /// during inflation after overlap resolution.  Uses a static empty
     /// Arc to avoid per-issue heap allocation.
     pub(crate) fn deferred_spelling(
@@ -804,7 +804,7 @@ impl Issue {
     }
 }
 
-/// Issue classification — covers spelling, case, punctuation, grammar, and AI
+/// Issue classification: covers spelling, case, punctuation, grammar, and AI
 /// style checks.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -819,12 +819,12 @@ pub enum IssueType {
     Grammar,
     /// AI writing artifact: filler phrases, semantic safety words, copula
     /// avoidance, passive voice overuse.  NOT eligible for orthographic-tier
-    /// fixes — requires lexical_contextual or none.
+    /// fixes: requires lexical_contextual or none.
     AiStyle,
     /// Consecutive duplicate word or character (e.g. '去去', 'cache cache').
     Repetition,
     /// Translationese (翻譯腔 / 歐化): Europeanized Chinese syntax/vocabulary.
-    /// Orthogonal to AiStyle — separate score, separate CLI/MCP surface.
+    /// Orthogonal to AiStyle: separate score, separate CLI/MCP surface.
     Translationese,
 }
 

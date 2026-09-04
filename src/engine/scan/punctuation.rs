@@ -84,8 +84,8 @@ impl Scanner {
                     ));
                 }
                 b'!' | b'?' | b';' => {
-                    // Guard: Markdown image syntax ![alt](url) — ! followed by
-                    // [ is never a prose exclamation mark.
+                    // Guard: Markdown image syntax ![alt](url), ! followed by [
+                    // is never a prose exclamation mark.
                     if b == b'!' && i + 1 < len && bytes[i + 1] == b'[' {
                         continue;
                     }
@@ -157,9 +157,9 @@ impl Scanner {
                         continue;
                     }
 
-                    // Guard: definition-list colon — `: ` at the start of a
-                    // line (possibly indented) is Markdown structural markup.
-                    // Pattern: (BOF or \n)(spaces/tabs)*`: `.
+                    // Guard: definition-list colon, ": " at the start of a line
+                    // (possibly indented) is Markdown structural markup.
+                    // Pattern: (BOF or \n)(spaces/tabs)*": ".
                     if i + 1 < len && bytes[i + 1] == b' ' {
                         let line_start = if i == 0 {
                             true
@@ -306,7 +306,7 @@ impl Scanner {
     /// Requires CJK adjacency on at least one side to avoid false positives on
     /// English typographic smart quotes and apostrophes (e.g., "Hello" or
     /// it's).
-    /// \u{2019} is the standard typographic apostrophe in English — without
+    /// \u{2019} is the standard typographic apostrophe in English: without
     /// this
     /// guard, words like "don't" would be destroyed.
     ///
@@ -447,7 +447,7 @@ impl Scanner {
                 if (i > 0 && bytes[i - 1] == b'-') || (i + 1 < len && bytes[i + 1] == b'-') {
                     continue;
                 }
-                // Guard: Markdown list bullet — skip if - is at line start.
+                // Guard: Markdown list bullet, skip if - is at line start.
                 let is_line_start = {
                     let mut j = i;
                     while j > 0 && (bytes[j - 1] == b' ' || bytes[j - 1] == b'\t') {

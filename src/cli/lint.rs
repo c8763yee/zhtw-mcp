@@ -1,8 +1,8 @@
 // The lint batch: scanning many files, applying fixes, and folding the per-file
 // results into one verdict.
 //
-// Phase 1 (`ScanCtx`) reads and scans, optionally across rayon threads. Phase 2
-// (`process_scanned_file`) is always sequential, because the output has to come
+// Phase 1 (ScanCtx) reads and scans, optionally across rayon threads. Phase 2
+// (process_scanned_file) is always sequential, because the output has to come
 // out in the order the user named the files.
 
 use anyhow::{Context, Result};
@@ -181,7 +181,7 @@ fn build_lint_setup(
     let cache_params = zhtw_mcp::cache::ScanParams {
         ruleset_hash,
 
-        // The whole effective config, not `profile.name()`. The name is the
+        // The whole effective config, not profile.name(). The name is the
         // profile the user asked for; the scanner is built from this struct,
         // and flags such as --relaxed change it without changing the name.
         // Keying on the name let a --relaxed run answer for a strict one and
@@ -277,7 +277,7 @@ pub(crate) fn run_lint_batch(params: &LintBatchParams<'_>) -> Result<()> {
     let setup = build_lint_setup(params, profile)?;
 
     // Only the cache is reached directly from here; the rest of the setup is
-    // read through `ScanCtx` and `FileCtx`, which borrow it whole.
+    // read through ScanCtx and FileCtx, which borrow it whole.
     let scan_cache = &setup.scan_cache;
 
     // --diff-from: resolve changed files via git, use as file args.
@@ -538,7 +538,7 @@ impl ScanCtx<'_> {
         let text_char_count = text.chars().count();
 
         // Slow-path cache: check content hash (mtime missed but content may be
-        // unchanged, e.g. after `touch`).
+        // unchanged, e.g. after touch).
         let content_hit = scan_cache.as_ref().and_then(|mtx| {
             let mut c = mtx.lock().ok()?;
             c.check_content(file_arg, text.as_bytes(), &cache_params)
@@ -571,7 +571,7 @@ impl ScanCtx<'_> {
         // The buffer used to be dropped here when no later phase was thought to
         // need it, to keep a parallel scan from holding every file's text at
         // once. Tier 2 was not counted among those phases, and it reads the
-        // document: `disambiguate_batch` weighs the words around each issue to
+        // document: disambiguate_batch weighs the words around each issue to
         // decide whether a clue-gated term really is the technical sense. With
         // an empty buffer it finds nothing and every such issue keeps its raw
         // severity, so "學習的進程" stayed a warning against the gate instead
@@ -994,8 +994,8 @@ fn process_scanned_file(
 
     // Apply project glossary precedence (proper_noun suppression + banned-term
     // injection) before disambiguation, so the rest of the pipeline sees the
-    // canonical issue list. Synthetic banned-term issues land with `line: 0,
-    // col: 0` from `Issue::new`; reapply LineIndex so output formatters and the
+    // canonical issue list. Synthetic banned-term issues land with line 0 and
+    // col 0 from Issue::new; reapply LineIndex so output formatters and the
     // consistency report see correct coordinates.
     issues = zhtw_mcp::rules::glossary::apply_glossary_with_coordinates(
         &text,

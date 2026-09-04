@@ -108,7 +108,7 @@ fn a_code_fence_is_not_a_section_boundary_in_either_content_type() {
     }
 }
 
-// Code block exclusion — spelling rules (5 tests)
+// Code block exclusion: spelling rules (5 tests)
 
 #[test]
 fn single_backtick_code_excluded() {
@@ -200,15 +200,15 @@ fn empty_autolink_no_crash() {
 
 #[test]
 fn multiple_excluded_blocks_only_outside_detected() {
-    // Should handle multiple exclusion zones correctly. `錯誤` is in code
-    // block, [錯誤](url) — "錯誤" in link text is NOT in URL, <http://錯誤> is
+    // Should handle multiple exclusion zones correctly. "錯誤" is in code
+    // block, [錯誤](url): "錯誤" in link text is NOT in URL, <http://錯誤> is
     // in URL. Only the bare 錯誤 at the end is detected.
     let scanner = Scanner::new(vec![spelling("錯誤", &["正確"])], vec![]);
     let text = "`錯誤` [錯誤](url) <http://錯誤> 這裡有錯誤";
     let issues = scanner.scan(text).issues;
 
     // The [錯誤] in link text is not excluded, and the trailing 錯誤 is not
-    // excluded. The `錯誤` in backticks and http://錯誤 in autolink ARE
+    // excluded. The "錯誤" in backticks and http://錯誤 in autolink ARE
     // excluded. So we expect 2 issues: [錯誤] in link text and the trailing
     // one.
     assert!(!issues.is_empty());
@@ -216,7 +216,7 @@ fn multiple_excluded_blocks_only_outside_detected() {
     assert!(issues.iter().any(|i| i.found == "錯誤"));
 }
 
-// Code block exclusion — case rules (4 tests)
+// Code block exclusion: case rules (4 tests)
 
 #[test]
 fn case_error_in_code_block_excluded() {
@@ -577,7 +577,7 @@ fn multiple_rules_each_respect_own_alternatives() {
     assert_eq!(issues[0].suggestions[..], vec!["TypeScript"]);
 }
 
-// Backtick nesting (2-6 backticks) — ported from loop test
+// Backtick nesting (2-6 backticks): ported from loop test
 
 #[test]
 fn double_backtick_excludes_case() {
@@ -618,7 +618,7 @@ fn sextuple_backtick_excludes_case() {
 
 #[test]
 fn empty_double_backtick_not_excluded() {
-    // Empty double backtick should not act as an exclusion barrier. `` with
+    // Empty double backtick should not act as an exclusion barrier. "" with
     // nothing matching is treated as empty inline code.
     let scanner = Scanner::new(vec![spelling("test", &["測試"])], vec![]);
     let issues = scanner.scan("這是 `` 然後這裡有 test 錯誤").issues;
@@ -705,7 +705,7 @@ fn punct_definition_list_colon_skipped() {
     use zhtw_mcp::engine::scan::ContentType;
     use zhtw_mcp::rules::ruleset::IssueType;
     let scanner = Scanner::new(vec![], vec![]);
-    // Markdown definition list: term on one line, `: definition` on the next.
+    // Markdown definition list: term on one line, ": definition" on the next.
     let text = "尾端延遲\n: 以互補累積分佈函數描述延遲";
     let output = scanner.scan_for_content_type(text, ContentType::Markdown, Profile::Base);
     let colon_issues: Vec<_> = output

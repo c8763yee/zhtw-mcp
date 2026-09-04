@@ -1,0 +1,8 @@
+# One false positive that the scripts here would otherwise carry a directive
+# for, answered once rather than in every file.
+
+# `dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)` is how a script finds its
+# own directory without CDPATH making `cd` echo where it went. shellcheck reads
+# the space in `CDPATH= cd` as a typo for `CDPATH=cd`; dropping it would run a
+# command named `cd` with CDPATH set to "cd".
+disable=SC1007

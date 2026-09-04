@@ -82,8 +82,8 @@ fn run(cli: Cli) -> Result<()> {
         ),
 
         // TM subcommand: manage translation memory. Respect .zhtw-mcp.toml
-        // translation_memory override so `tm record` writes to the same file
-        // that `lint` reads.
+        // translation_memory override so "tm record" writes to the same file
+        // that lint reads.
         Command::Tm(tm) => {
             let cwd = std::env::current_dir().unwrap_or_default();
             let project_cfg = match &config_path {
@@ -176,7 +176,7 @@ fn run_lint(
         .or_else(|| cfg_ref.and_then(|c| c.profile.as_deref()));
     // CLI --relaxed flag overrides config file relaxed setting.
     let eff_relaxed = lint.relaxed || cfg_ref.and_then(|c| c.relaxed).unwrap_or(false);
-    // CLI --exempt-blockquotes flag OR `[markdown] exempt_blockquotes`.
+    // CLI --exempt-blockquotes flag OR "[markdown] exempt_blockquotes".
     let eff_exempt_blockquotes = lint.exempt_blockquotes
         || cfg_ref
             .and_then(|c| c.markdown.as_ref())
@@ -221,7 +221,7 @@ fn run_lint(
             zhtw_mcp::rules::store::discover_tm_path(&cwd)
         });
 
-    // Build project glossary from `[glossary]` section.
+    // Build project glossary from [glossary] section.
     let eff_glossary = cfg_ref
         .and_then(|c| c.glossary.as_ref())
         .map(|g| zhtw_mcp::rules::glossary::ProjectGlossary {
@@ -332,9 +332,9 @@ fn run_server(
             }
 
             // A pre-handshake request the SDK answered and then declined to
-            // continue from, which in practice is a `server/discover` missing
-            // the per-request metadata its revision requires. The client has
-            // its error; ending quietly is the whole of the outcome.
+            // continue from, which in practice is a server/discover missing the
+            // per-request metadata its revision requires. The client has its
+            // error; ending quietly is the whole of the outcome.
             Err(rmcp::service::ServerInitializeError::ExpectedInitializeRequest(message)) => {
                 tracing::warn!("client ended the session before initialize: {message:?}");
                 return Ok(());
@@ -361,7 +361,7 @@ fn run_server(
     // the drain would hold the process open indefinitely, having already been
     // given up on. Shutting down with a deadline keeps the exit bounded;
     // whatever the scan still held is lost either way, and the judgment cache
-    // is flushed on the `exit` path rather than here.
+    // is flushed on the exit path rather than here.
     runtime.shutdown_timeout(zhtw_mcp::mcp::transport::BLOCKING_SHUTDOWN_GRACE);
     outcome
 }
@@ -410,11 +410,11 @@ fn run_convert(
     let store = OverrideStore::open(&overrides_path)?;
     let ruleset = load_embedded_ruleset()?;
 
-    // The active packs, not an empty selection. Passing `&[]` here meant every
-    // convert ran against the unpacked ruleset: `--pack` parsed, the command
+    // The active packs, not an empty selection. Passing "&[]" here meant every
+    // convert ran against the unpacked ruleset: --pack parsed, the command
     // succeeded, and the answer was computed from rules the caller had asked to
-    // add. That reached the fix loop below as well as `--verify`, so the
-    // rewrite itself was wrong, not just the verification of it.
+    // add. That reached the fix loop below as well as --verify, so the rewrite
+    // itself was wrong, not just the verification of it.
     let (spelling_rules, case_rules) = zhtw_mcp::rules::store::build_merged_rules(
         &ruleset.spelling_rules,
         &ruleset.case_rules,
@@ -425,7 +425,7 @@ fn run_convert(
     let scanner = Scanner::new(spelling_rules, case_rules);
 
     // Determine content type. Same rule as the lint path. Keeping a second copy
-    // here had convert reading `.markdown` and `README.MD` as plain text, so it
+    // here had convert reading .markdown and README.MD as plain text, so it
     // rewrote what a code fence was there to protect.
     let content_type = content_type_for(
         content_type_str,
@@ -435,7 +435,7 @@ fn run_convert(
             .map_or("", |f| f.as_str()),
     );
 
-    // Step 3: Iterative fix loop — scan + fix until convergence or max rounds.
+    // Step 3: Iterative fix loop, scan + fix until convergence or max rounds.
     let mut text = s2t_output;
     let max_rounds = 3;
     for round in 0..max_rounds {

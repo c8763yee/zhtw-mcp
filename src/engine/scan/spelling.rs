@@ -620,8 +620,8 @@ mod tests {
 
     #[test]
     fn quality_flag_asr_only_for_asr_confusables() {
-        // "函數" is a non-ASR confusable — should NOT set "asr_artifacts".
-        // "機體" near RAM clues is an ASR confusable — should set it.
+        // "函數" is a non-ASR confusable: should NOT set "asr_artifacts".
+        // "機體" near RAM clues is an ASR confusable: should set it.
         let scanner = make_scanner();
 
         let output1 = scanner.scan("函數在數學領域是 sin cos 的統稱");

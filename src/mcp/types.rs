@@ -224,20 +224,20 @@ impl TransportError {
 pub fn parse_jsonrpc_line(line: &str) -> Result<JsonRpcRequest, TransportError> {
     // Step 1: parse as generic JSON.
     //
-    // Everything goes through Value.  Deserializing straight into
-    // JsonRpcRequest is measurably faster but not equivalent: serde's
-    // ignore-unknown-field path skips strings without decoding them, so a lone
-    // UTF-16 surrogate escape in a field this struct does not name parses fine
-    // there and fails here.  The server must not act on a line its own JSON
-    // parser rejects, and a few hundred nanoseconds do not buy that.
+    // Everything goes through Value. Deserializing straight into JsonRpcRequest
+    // is measurably faster but not equivalent: serde's ignore-unknown-field
+    // path skips strings without decoding them, so a lone UTF-16 surrogate
+    // escape in a field this struct does not name parses fine there and fails
+    // here. The server must not act on a line its own JSON parser rejects, and
+    // a few hundred nanoseconds do not buy that.
     let obj: serde_json::Value = serde_json::from_str(line).map_err(TransportError::Parse)?;
 
-    // Step 2: a JSON-RPC message is an object.  Arrays (batches, which MCP
-    // does not support, and positional forms) and bare scalars are invalid
-    // requests.  No id can be recovered from them, so none is echoed.
+    // Step 2: a JSON-RPC message is an object. Arrays (batches, which MCP does
+    // not support, and positional forms) and bare scalars are invalid requests.
+    // No id can be recovered from them, so none is echoed.
     //
     // This check is what keeps serde from building a JsonRpcRequest out of a
-    // positional array in step 5: `["2.0",1,"ping",{}]` deserializes into the
+    // positional array in step 5: '["2.0",1,"ping",{}]' deserializes into the
     // struct just as happily as an object does.
     if !obj.is_object() {
         return Err(TransportError::InvalidRequest(
@@ -247,9 +247,9 @@ pub fn parse_jsonrpc_line(line: &str) -> Result<JsonRpcRequest, TransportError> 
     }
 
     // Step 3: extract id once for error correlation across all branches.
-    // id_present is true when the JSON has an "id" key (even if null or
-    // an unparseable type like boolean/array).  raw_id is the parsed id
-    // when it's a valid string, integer, or null.
+    // id_present is true when the JSON has an "id" key (even if null or an
+    // unparseable type like boolean/array). raw_id is the parsed id when it's a
+    // valid string, integer, or null.
     let id_value = obj.get("id");
     let raw_id: Option<RequestId> = id_value.and_then(|v| serde_json::from_value(v.clone()).ok());
     let id_present = id_value.is_some();
@@ -259,20 +259,21 @@ pub fn parse_jsonrpc_line(line: &str) -> Result<JsonRpcRequest, TransportError> 
         let is_response = obj.get("result").is_some() || obj.get("error").is_some();
         if is_response {
             // Response-shaped (has result/error, no method): silently discard.
-            // JSON-RPC 2.0: "The Server MUST NOT reply to a Response."
-            // Covers late sampling responses (with id) and orphaned responses
-            // (without id).
+            // JSON-RPC 2.0: "The Server MUST NOT reply to a Response." Covers
+            // late sampling responses (with id) and orphaned responses (without
+            // id).
             return Err(TransportError::PeerResponse);
         }
         if id_present {
-            // Has id, no method, not response-shaped — genuinely invalid.
+            // Has id, no method, not response-shaped: genuinely invalid.
             return Err(TransportError::InvalidRequest(
                 raw_id,
                 "message has id but no method".into(),
             ));
         }
-        // No id, no method, no result/error — genuinely invalid request
-        // (e.g. `{}` or `{"foo":"bar"}`).
+
+        // No id, no method, no result/error: genuinely invalid request (e.g.
+        // "{}" or '{"foo":"bar"}').
         return Err(TransportError::InvalidRequest(
             None,
             "object has no method, result, or error field".into(),
@@ -387,6 +388,7 @@ mod tests {
             data: Some(json!({"field": "profile", "accepted": ["base", "strict"]})),
         };
         let json = serde_json::to_string(&err).unwrap();
+
         // Read the wire, not the struct. Parsing back through the same derive
         // that produced the JSON is self-consistent by construction: a stray
         // rename on a field would survive it, while these pin the key names
@@ -525,8 +527,8 @@ mod tests {
 
     #[test]
     fn parse_positional_array_returns_invalid_request() {
-        // serde deserializes a struct from a positional sequence, so without
-        // an explicit object check this parsed as a valid ping and the server
+        // serde deserializes a struct from a positional sequence, so without an
+        // explicit object check this parsed as a valid ping and the server
         // answered it.
         let line = r#"["2.0",1,"ping",{}]"#;
         let err = parse_jsonrpc_line(line).unwrap_err();
@@ -566,11 +568,11 @@ mod tests {
 
     #[test]
     fn parse_lone_surrogate_in_ignored_field_is_a_parse_error() {
-        // Regression guard against reintroducing a
-        // `from_str::<JsonRpcRequest>` shortcut: serde's ignore-unknown-field
-        // path skips strings without decoding them, so this line parses as a
-        // request there but not as a Value. Acting on it would mean executing
-        // a message our own JSON parser rejects.
+        // Regression guard against reintroducing a from_str::<JsonRpcRequest>
+        // shortcut: serde's ignore-unknown-field path skips strings without
+        // decoding them, so this line parses as a request there but not as a
+        // Value. Acting on it would mean executing a message our own JSON
+        // parser rejects.
         let line = r#"{"jsonrpc":"2.0","method":"ping","id":1,"x":"\ud800"}"#;
         let err = parse_jsonrpc_line(line).unwrap_err();
         assert!(matches!(err, TransportError::Parse(_)));

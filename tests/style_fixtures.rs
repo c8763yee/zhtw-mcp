@@ -1,7 +1,7 @@
 // Fixture-driven suite for the AI-filler and translationese axes.
 //
-// Each directory under `tests/fixtures/` pairs a `*_bad.txt` that must fire its
-// axis with one or more `*_good*.txt` that must not. The pairing is the whole
+// Each directory under tests/fixtures/ pairs a *_bad.txt that must fire its
+// axis with one or more *_good*.txt that must not. The pairing is the whole
 // point: a detector that fires on everything passes the bad half and fails the
 // good half, so both directions have to hold.
 //

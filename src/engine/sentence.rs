@@ -1,12 +1,12 @@
 // Sentence and paragraph boundary index.
 //
 // Provides reusable boundary detection for grammar checks, structural AI
-// pattern detection, and translationese scoring.  Computed once per scan,
-// shared across consumers.
+// pattern detection, and translationese scoring. Computed once per scan, shared
+// across consumers.
 //
-// Chinese sentence boundaries: 。？！；and blank-line paragraph breaks.
-// Mixed CJK/Latin: also split on .?! followed by whitespace + uppercase.
-// Abbreviation deny-list prevents false splits (Mr., P.S., etc.).
+// Chinese sentence boundaries: 。？！；and blank-line paragraph breaks. Mixed
+// CJK/Latin: also split on .?! followed by whitespace + uppercase. Abbreviation
+// deny-list prevents false splits (Mr., P.S., etc.).
 
 use crate::engine::excluded::{is_excluded, ByteRange};
 
@@ -37,7 +37,7 @@ const CJK_TERMINATORS: &[char] = &['。', '！', '？'];
 // Semicolons act as sentence boundaries in Chinese text.
 const CJK_SOFT_TERMINATORS: &[char] = &['；'];
 
-// Latin terminal punctuation -- only triggers a split when followed by
+// Latin terminal punctuation, which only triggers a split when followed by
 // whitespace + uppercase letter (to avoid splitting on abbreviations).
 const LATIN_TERMINATORS: &[char] = &['.', '?', '!'];
 
@@ -65,7 +65,8 @@ impl BoundaryIndex {
     }
 
     /// Find the sentence containing byte offset `pos`.
-    /// Returns None if pos is outside all sentences (e.g. inside an exclusion zone).
+    /// Returns None if pos is outside all sentences (e.g. inside an exclusion
+    /// zone).
     pub fn sentence_at(&self, pos: usize) -> Option<&SentenceBound> {
         self.sentences
             .iter()
@@ -143,10 +144,9 @@ fn build_sentences(text: &str, excluded: &[ByteRange]) -> Vec<SentenceBound> {
 
         // The same blank-line rule the paragraph splitters use: a newline, an
         // optional "\r", another newline. Recognising only the two pure forms
-        // left a mixed "\n\r\n" document with paragraph bounds that no
-        // sentence bound matched, so "sentence_slice" returned nothing for
-        // either paragraph and every paragraph-scoped detector skipped the
-        // content.
+        // left a mixed "\n\r\n" document with paragraph bounds that no sentence
+        // bound matched, so "sentence_slice" returned nothing for either
+        // paragraph and every paragraph-scoped detector skipped the content.
         let paragraph_break_len = match ch {
             // Locate the "\n" of the first terminator, whichever form it takes.
             '\r' if bytes.get(ch_end) == Some(&b'\n') => blank_line_end(bytes, ch_end),
@@ -208,7 +208,8 @@ fn is_latin_sentence_end(text: &str, dot_start: usize, dot_end: usize) -> bool {
     let mut chars = rest.chars().peekable();
 
     // Must be followed by at least one whitespace char; consume the full
-    // whitespace run (not just the first) so "home.  He" still splits.
+    // whitespace run rather than the first, so a period followed by two spaces
+    // and a capital still splits.
     match chars.peek() {
         Some(c) if c.is_whitespace() => {}
         _ => return false,
@@ -227,9 +228,9 @@ fn is_latin_sentence_end(text: &str, dot_start: usize, dot_end: usize) -> bool {
         _ => return false,
     }
 
-    // Check abbreviation deny-list: look at text before the dot.
-    // Word boundary = start of text, ASCII whitespace/punct, or CJK char
-    // (no ASCII letter immediately before the abbreviation).
+    // Check abbreviation deny-list: look at text before the dot. Word boundary
+    // = start of text, ASCII whitespace/punct, or CJK char (no ASCII letter
+    // immediately before the abbreviation).
     let before = &text[..dot_start];
     for abbr in ABBREVIATION_SUFFIXES {
         if before.ends_with(abbr) {
@@ -304,9 +305,9 @@ fn build_paragraphs(text: &str) -> Vec<ParagraphBound> {
     let mut i = 0;
 
     while i < len {
-        // A blank line is two terminators in a row, and either may be "\r\n"
-        // or "\n". Matching only the two pure forms missed a document that
-        // mixes them around one blank line, which is what a patch or a merge
+        // A blank line is two terminators in a row, and either may be "\r\n" or
+        // "\n". Matching only the two pure forms missed a document that mixes
+        // them around one blank line, which is what a patch or a merge
         // produces, and the paragraph then swallowed the rest of the file.
         if bytes[i] == b'\n' {
             if let Some(next) = blank_line_end(bytes, i) {
@@ -415,8 +416,8 @@ mod tests {
 
     #[test]
     fn latin_sentence_splits_across_multiple_whitespaces() {
-        // cubic review: must handle multiple spaces / tabs / newlines
-        // between the terminator and the next capital letter.
+        // cubic review: must handle multiple spaces / tabs / newlines between
+        // the terminator and the next capital letter.
         let text = "Alice went home.  Bob followed.";
         let idx = bounds(text);
         assert_eq!(idx.sentences.len(), 2);
@@ -450,7 +451,9 @@ mod tests {
     #[test]
     fn exclusion_zone_breaks_sentence() {
         let text = "前面的文字`code`後面的文字。";
-        // Simulate exclusion zone over `code` (bytes for the backtick-wrapped part).
+
+        // Simulate exclusion zone over code (bytes for the backtick-wrapped
+        // part).
         let code_start = text.find('`').unwrap();
         let code_end = text.rfind('`').unwrap() + 1;
         let excluded = vec![ByteRange {

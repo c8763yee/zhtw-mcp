@@ -1,7 +1,7 @@
 // Document-level translationese (翻譯腔/歐化) scoring.
 //
-// Orthogonal to AI signature scoring. A translated technical manual is
-// 歐化 but not AI-generated. Separate output struct, separate threshold.
+// Orthogonal to AI signature scoring. A translated technical manual is 歐化 but
+// not AI-generated. Separate output struct, separate threshold.
 //
 // Composite score from:
 // 1. Passive voice density (被 per 1000 chars)
@@ -54,11 +54,11 @@ pub enum TranslationeseDomain {
     /// Balanced thresholds suitable for general prose.
     #[default]
     General,
-    /// Technical writing — looser thresholds for passive voice and weak verbs.
+    /// Technical writing: looser thresholds for passive voice and weak verbs.
     Technical,
-    /// Literary writing — tighter thresholds, especially for de-chains.
+    /// Literary writing: tighter thresholds, especially for de-chains.
     Literary,
-    /// News writing — moderate thresholds, favors active voice.
+    /// News writing: moderate thresholds, favors active voice.
     News,
 }
 
@@ -107,10 +107,11 @@ impl TranslationeseDomain {
                 pronoun: 6.0,
                 de_chain: 5,
                 issue_density: 7.0,
-                // Register crosswalk: external `literal` style ↔ technical_docs.
+
+                // Register crosswalk: external literal style ↔ technical_docs.
                 // Looser ZY1b density (technical writing accepts repeated
-                // "...之一" enumerations); higher ZY3b chain threshold
-                // (chained nominalization tolerated more in technical text).
+                // "...之一" enumerations); higher ZY3b chain threshold (chained
+                // nominalization tolerated more in technical text).
                 zy1b_per_200: 3.0,
                 zy3b_chain_min: 4,
                 zy5_min_chars: 18,
@@ -131,7 +132,7 @@ impl TranslationeseDomain {
             },
             TranslationeseDomain::News => DomainThresholds {
                 // News writing favors active voice and concise sentences.
-                // Register crosswalk: external `storytelling` style ↔ newsroom.
+                // Register crosswalk: external storytelling style ↔ newsroom.
                 passive: 2.5,
                 weak_verb: 2.0,
                 pronoun: 7.0,
@@ -171,7 +172,7 @@ pub struct DomainThresholds {
     pub zy5_min_de_count: usize,
 }
 
-// Per-signal weights — kept constant across domains; only thresholds shift.
+// Per-signal weights: kept constant across domains; only thresholds shift.
 const PASSIVE_WEIGHT: f32 = 1.0;
 const WEAK_VERB_WEIGHT: f32 = 0.8;
 const PRONOUN_WEIGHT: f32 = 0.6;
@@ -182,10 +183,10 @@ const ISSUE_DENSITY_WEIGHT: f32 = 0.5;
 const WEAK_VERB_PREFIXES: &[&str] = &["進行", "加以", "予以", "展開", "作出", "給予", "提供"];
 
 // Objects that, when following a weak-verb prefix, confirm the pattern is a
-// real bureaucratic nominalization ("進行討論" → "討論") rather than a
-// literal standalone use of the prefix ("進行" alone = "in progress").
-// Kept in sync with src/engine/scan/grammar.rs NOMINALIZED_VERBS /
-// VERBOSE_ACTION_OBJECTS so the scoring signal aligns with per-issue flagging.
+// real bureaucratic nominalization ("進行討論" → "討論") rather than a literal
+// standalone use of the prefix ("進行" alone = "in progress"). Kept in sync
+// with src/engine/scan/grammar.rs NOMINALIZED_VERBS / VERBOSE_ACTION_OBJECTS so
+// the scoring signal aligns with per-issue flagging.
 const WEAK_VERB_OBJECTS: &[&str] = &[
     "討論", "分析", "研究", "調查", "測試", "開發", "設計", "評估", "檢查", "審查", "修改", "更新",
     "比較", "溝通", "合作", "訓練", "處理", "管理", "規劃", "改善", "調整", "整合", "驗證", "觀察",
@@ -193,7 +194,7 @@ const WEAK_VERB_OBJECTS: &[&str] = &[
     "保證", "回答", "犧牲", "努力", "支援", "協助", "檢討", "投票", "改革", "發表", "發展",
 ];
 
-// Pronouns to count for density.  Multi-character forms come first so the
+// Pronouns to count for density. Multi-character forms come first so the
 // longest-match scan does not double-count "他們" as "他" + "他們".
 const PRONOUNS: &[&str] = &["他們", "她們", "他", "她", "它"];
 
@@ -211,7 +212,7 @@ pub fn compute_translationese_score(
 
 /// Compute translationese report with a specified domain calibration.
 ///
-/// Different domains use different threshold tables — see
+/// Different domains use different threshold tables: see
 /// [`TranslationeseDomain::thresholds`] for the values.
 pub fn compute_translationese_score_with_domain(
     text: &str,
@@ -241,9 +242,9 @@ pub fn compute_translationese_score_with_domain(
     let mut weighted_sum: f32 = 0.0;
     let mut total_weight: f32 = 0.0;
 
-    // Record a signal: push its marker, and add its excess contribution to
-    // the weighted sum when `over_threshold` is true.  Excess is clamped at
-    // 2x the threshold to prevent a single runaway signal from dominating.
+    // Record a signal: push its marker, and add its excess contribution to the
+    // weighted sum when over_threshold is true. Excess is clamped at 2x the
+    // threshold to prevent a single runaway signal from dominating.
     let mut record = |signal: &str,
                       count: usize,
                       density: f32,
@@ -257,8 +258,8 @@ pub fn compute_translationese_score_with_domain(
             threshold,
         });
         if over_threshold {
-            // Excess is capped at 2.0; floor at 0.1 so an exact threshold
-            // hit still contributes (matches the >= semantics for de-chain).
+            // Excess is capped at 2.0; floor at 0.1 so an exact threshold hit
+            // still contributes (matches the >= semantics for de-chain).
             let raw_excess = ((density - threshold) / threshold).min(2.0);
             let excess = raw_excess.max(0.1);
             weighted_sum += excess * weight;
@@ -278,8 +279,8 @@ pub fn compute_translationese_score_with_domain(
         passive_density > t.passive,
     );
 
-    // Signal 2: 的-chain depth.  Uses >= so that exactly hitting the
-    // threshold still contributes.
+    // Signal 2: 的-chain depth. Uses >= so that exactly hitting the threshold
+    // still contributes.
     let max_de_chain = compute_max_de_chain(text, excluded);
     record(
         "的字鏈",
@@ -302,8 +303,8 @@ pub fn compute_translationese_score_with_domain(
         weak_verb_density > t.weak_verb,
     );
 
-    // Signal 4: pronoun density. Use longest-match scan to avoid counting
-    // 他們 as both 他 and 他們.
+    // Signal 4: pronoun density. Use longest-match scan to avoid counting 他們
+    // as both 他 and 他們.
     let pronoun_count = count_longest_match(text, PRONOUNS, excluded);
     let pronoun_density = pronoun_count as f32 / text_k;
     record(
@@ -433,8 +434,9 @@ fn compute_max_de_chain(text: &str, excluded: &[ByteRange]) -> usize {
         } else if matches!(ch, '，' | ',' | '。' | '！' | '？' | '；' | '\n') {
             current_chain = 0;
         }
-        // Non-的 CJK characters don't reset the chain -- we're counting
-        // 的 in patterns like X的Y的Z的W.
+
+        // Non-的 CJK characters don't reset the chain: we're counting 的 in
+        // patterns like X的Y的Z的W.
     }
     max_chain
 }
@@ -456,17 +458,19 @@ fn count_weak_verbs(text: &str, excluded: &[ByteRange]) -> usize {
             if is_excluded(abs, after, excluded) {
                 continue;
             }
-            // Require a known weak-verb object starting at `after`.
-            // Look ahead up to 4 chars (handles optional 了/的 between
-            // prefix and object, e.g. "進行了討論").
+
+            // Require a known weak-verb object starting at after. Look ahead up
+            // to 4 chars (handles optional 了/的 between prefix and object,
+            // e.g. "進行了討論").
             let lookahead_end = text[after..]
                 .char_indices()
                 .nth(4)
                 .map(|(i, _)| after + i)
                 .unwrap_or(text.len());
             let window = &text[after..lookahead_end];
-            // Both prefix and object must be outside excluded zones; an
-            // object span buried inside a code fence does not count.
+
+            // Both prefix and object must be outside excluded zones; an object
+            // span buried inside a code fence does not count.
             if WEAK_VERB_OBJECTS.iter().any(|obj| {
                 window.find(obj).is_some_and(|obj_pos| {
                     let obj_start = after + obj_pos;
@@ -632,8 +636,8 @@ mod tests {
 
     #[test]
     fn weak_verb_count_rejects_bare_prefix() {
-        // "進行" alone = "in progress" (legitimate standalone use); must
-        // not inflate the weak-verb signal.
+        // "進行" alone = "in progress" (legitimate standalone use); must not
+        // inflate the weak-verb signal.
         assert_eq!(count_weak_verbs("專案正在進行，尚未完成。", &[]), 0);
         // "進行中" likewise has no nominalized object.
         assert_eq!(count_weak_verbs("工作進行中，請稍候。", &[]), 0);
@@ -641,15 +645,15 @@ mod tests {
 
     #[test]
     fn weak_verb_count_allows_intervening_particles() {
-        // "進行了討論" — the 了 between prefix and object should still count.
+        // "進行了討論": the 了 between prefix and object should still count.
         assert_eq!(count_weak_verbs("他們進行了討論並加以了分析", &[]), 2);
     }
 
     #[test]
     fn weak_verb_count_skips_excluded_object() {
         // Codex round 4: an object span inside an exclusion zone (e.g. inline
-        // code) must not count toward the weak-verb signal even when the
-        // prefix itself is in clean prose.
+        // code) must not count toward the weak-verb signal even when the prefix
+        // itself is in clean prose.
         let text = "他們進行討論之後，我們進行討論再次回顧。";
         // Mark the second "討論" (bytes 33..39 in this string) as excluded.
         let second_obj_start = text.rfind("討論").unwrap();
@@ -657,15 +661,16 @@ mod tests {
             start: second_obj_start,
             end: second_obj_start + "討論".len(),
         }];
-        // Without the fix: count = 2.  With the fix: only the unexcluded
-        // first occurrence counts → 1.
+
+        // Without the fix: count = 2. With the fix: only the unexcluded first
+        // occurrence counts → 1.
         assert_eq!(count_weak_verbs(text, &excluded), 1);
     }
 
     #[test]
     fn report_deserializes_without_domain_field() {
-        // Codex round 4: pre-domain cache entries must still load.  Without
-        // serde(default) on `domain`, a single old entry would cause
+        // Codex round 4: pre-domain cache entries must still load. Without
+        // serde(default) on domain, a single old entry would cause
         // load_entries() to discard the whole cache file.
         let json = r#"{
             "score": 0.5,

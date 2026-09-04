@@ -57,9 +57,33 @@ check: $(S2T_STAMP)
 # shapes as well. Library only, since the binary needs native.
 	cargo clippy --lib --no-default-features -- -D warnings
 	cargo clippy --lib --no-default-features --features browser-wasm -- -D warnings
-	cargo fmt --check
-	black --check .
+# One script owns the formatter chain, so what `make indent` rewrites is what
+# this checks: comment reflow, then cargo fmt, black, shfmt and the ruleset
+# normalizer.  It runs them against a copy of the tree, so a check never
+# rewrites what it is judging.  Lanes whose tool is missing report a skip, which
+# is why a green local run is weaker evidence than a green CI run.
+	./scripts/indent.sh --check
 	python3 scripts/check-ruleset.py --lint --baseline-ref $(RULESET_BASELINE_EFFECTIVE)
+# The hooks are the one part of this tree with no other gate behind them: they
+# run in a directory the test suite never looks at, and a hook that stops
+# rejecting looks exactly like a hook that passes.
+	./scripts/test-git-hooks.sh
+# No em dash and no backtick outside a doc comment.  Neither formatter knows
+# about either rule, so without this the tree grows them back one comment at a
+# time.
+	./scripts/check-comments.sh
+# Optional in the same way the formatter lanes are, and honouring
+# ZHTW_REQUIRE_TOOLS for the same reason they do: CI installs shellcheck on the
+# leg that sets it, so a runner that stops carrying it has to fail rather than
+# quietly stop linting shell.
+	@if command -v shellcheck > /dev/null 2>&1; then \
+		shellcheck $$(git ls-files --cached --others --exclude-standard -- '*.sh'); \
+	elif [ -n "$$ZHTW_REQUIRE_TOOLS" ]; then \
+		echo "shellcheck is required here and is not installed"; \
+		exit 1; \
+	else \
+		echo "shellcheck not installed, skipping the shell lint"; \
+	fi
 
 check-size: all
 	@SIZE=$$(wc -c < target/release/zhtw-mcp | tr -d ' '); \
@@ -72,15 +96,24 @@ check-size: all
 	fi
 
 indent: $(S2T_STAMP)
-	cargo fmt
-	python3 scripts/check-ruleset.py --baseline-ref $(RULESET_BASELINE_EFFECTIVE)
+	@./scripts/indent.sh --write
 	python3 scripts/check-ruleset.py --lint --baseline-ref $(RULESET_BASELINE_EFFECTIVE)
-	black .
 
 corpus: $(S2T_STAMP)
 	cargo test --test corpus-evaluation -- --nocapture
 
-.PHONY: all clean distclean check check-size corpus indent install uninstall status
+.PHONY: all clean distclean check check-size corpus indent install uninstall \
+	status hooks uninstall-hooks
+
+# The hooks run the fast half of the gate over the staged content and hold the
+# commit message to the rules the log already follows.  A release build installs
+# them, because a hook nobody installed is a hook nobody runs; this target is for
+# anyone who wants the install on its own, or wants it back after removing it.
+hooks:
+	@./scripts/install-git-hooks.sh
+
+uninstall-hooks:
+	@./scripts/install-git-hooks.sh --uninstall
 
 install: all
 	@./scripts/deploy.sh install

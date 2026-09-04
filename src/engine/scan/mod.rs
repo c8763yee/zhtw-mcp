@@ -5,13 +5,13 @@
 //
 //   1. Build excluded ranges (URLs, paths, @mentions, code fences).
 //   2. Detect Chinese type (Traditional vs Simplified).
-//   3. Aho-Corasick scan for spelling rules — skip excluded positions,
+//   3. Aho-Corasick scan for spelling rules: skip excluded positions,
 //      skip variant rules when text is Simplified.
-//   4. Aho-Corasick scan for case rules — check word boundaries and
+//   4. Aho-Corasick scan for case rules: check word boundaries and
 //      compare matched text against valid forms (term + alternatives).
 //   5. Punctuation, spacing, ellipsis, quote checks.
 //   6. Overlap resolution (longest match wins).
-//   7. Grammar checks (interlingual transfer, A-not-A + 嗎 clash) —
+//   7. Grammar checks (interlingual transfer, A-not-A + 嗎 clash), which
 //      run after overlap resolution to avoid suppressing narrower issues.
 
 mod acronym;
@@ -50,7 +50,7 @@ use crate::rules::ruleset::{
 use self::ellipsis::scan_ellipsis;
 use self::quotes::{fix_quote_pairing, validate_quote_hierarchy};
 
-// Scratch space — reusable buffers for per-scan mutable state
+// Scratch space: reusable buffers for per-scan mutable state
 
 /// Pre-allocated buffers for per-scan mutable state.
 ///
@@ -640,7 +640,7 @@ pub(crate) fn is_cjk_ideograph(ch: char) -> bool {
     )
 }
 
-/// Returns true if ch is a CJK context character — either a CJK ideograph
+/// Returns true if ch is a CJK context character: either a CJK ideograph
 /// or a CJK punctuation/bracket mark.  Used by adjacent_cjk so that
 /// text like 他說「你好」. correctly recognises 」 as CJK context.
 pub(crate) fn is_cjk_context(ch: char) -> bool {
@@ -651,7 +651,7 @@ pub(crate) fn is_cjk_context(ch: char) -> bool {
             // ideographic space)
             '\u{3001}'..='\u{303F}' |
 
-            // Fullwidth Forms — fullwidth punctuation and letters
+            // Fullwidth Forms: fullwidth punctuation and letters
             // (U+FF01..U+FF60)
             '\u{FF01}'..='\u{FF60}' |
             // Halfwidth CJK punctuation (U+FF61..U+FF65)
@@ -1088,7 +1088,7 @@ impl Scanner {
     /// [`ProfileConfig::exempt_blockquotes`] only take effect on
     /// the NFC-rebuild path, where exclusions are recomputed from the
     /// supplied [`ProfileConfig`].  On the fast path the caller-supplied
-    /// `excluded` slice is used verbatim — if the caller wants
+    /// `excluded` slice is used verbatim: if the caller wants
     /// blockquotes excluded, they must build the slice with
     /// [`build_exclusions_for_content_type_with_options`] using a
     /// matching [`MdScanOptions`].
@@ -1531,9 +1531,9 @@ impl Scanner {
         let oral_density = compute_oral_density(text);
 
         // No empty-issues shortcut here on purpose: with no issues the sort,
-        // the line/col fill, and `build_quality_flags` are all no-ops and
-        // `rules_matched` is already 0, so a special case would only be a
-        // second copy of this same tail.
+        // the line/col fill, and build_quality_flags are all no-ops and
+        // rules_matched is already 0, so a special case would only be a second
+        // copy of this same tail.
         //
         // Deterministic output contract: issues are sorted by byte offset
         // ascending, then severity descending, then rule_type discriminant for
@@ -1622,8 +1622,8 @@ fn run_structural_passes(
             grammar::scan_translationese_syntactic(text, excluded, issues, idx);
 
             // Boundary-aware translationese detectors (ZY1b/ZY2b/ZY3b/ZY5).
-            // `cfg.translationese_domain` selects the per-domain threshold
-            // table that drives firing behavior at scan time.
+            // cfg.translationese_domain selects the per-domain threshold table
+            // that drives firing behavior at scan time.
             grammar::scan_translationese_indexed(
                 text,
                 excluded,
@@ -2395,7 +2395,7 @@ mod tests {
 
     #[test]
     fn charwise_leftmost_longest_on_overlapping_patterns() {
-        // "數據" and "數據庫" overlap — leftmost-longest must pick "數據庫".
+        // "數據" and "數據庫" overlap: leftmost-longest must pick "數據庫".
         let rules = vec![
             SpellingRule::new("數據", vec!["資料".into()], RuleType::CrossStrait),
             SpellingRule::new("數據庫", vec!["資料庫".into()], RuleType::CrossStrait),
@@ -2614,7 +2614,7 @@ mod tests {
         let scanner = Scanner::new(rules, vec![]);
         assert!(scanner.spelling_db.ac_charwise.is_some());
 
-        // "下著" is an exception — should not fire.
+        // "下著" is an exception: should not fire.
         let issues = scanner.scan_profiled("下著棋", Profile::Strict).issues;
         assert!(
             issues.is_empty(),
@@ -2632,14 +2632,14 @@ mod tests {
         let scanner = Scanner::new(rules, vec![]);
         assert!(scanner.spelling_db.ac_charwise.is_some());
 
-        // No context clue present — should NOT fire.
+        // No context clue present: should NOT fire.
         let issues = scanner.scan("我支持你的決定").issues;
         assert!(
             issues.is_empty(),
             "should not fire without context clues: {issues:?}"
         );
 
-        // Context clue present — SHOULD fire.
+        // Context clue present: SHOULD fire.
         let issues = scanner.scan("這個程式支持多種格式").issues;
         assert_eq!(issues.len(), 1);
         assert_eq!(issues[0].found, "支持");
@@ -2655,12 +2655,12 @@ mod tests {
         let scanner = Scanner::new(rules, vec![]);
         assert!(scanner.spelling_db.ac_charwise.is_some());
 
-        // No negative clue — should fire.
+        // No negative clue: should fire.
         let issues = scanner.scan("請卸載這個應用程式").issues;
         assert_eq!(issues.len(), 1);
         assert_eq!(issues[0].found, "卸載");
 
-        // Negative clue present — should NOT fire.
+        // Negative clue present: should NOT fire.
         let issues = scanner.scan("掛載和卸載檔案系統").issues;
         assert!(
             issues.is_empty(),
@@ -2724,7 +2724,7 @@ mod tests {
         let scanner = Scanner::new(rules, vec![]);
         assert!(scanner.spelling_db.ac_charwise.is_some());
 
-        // "軟件開發" — both patterns match adjacently.
+        // "軟件開發": both patterns match adjacently.
         let issues = scanner.scan("軟件開發很重要").issues;
         assert_eq!(issues.len(), 2);
         assert_eq!(issues[0].found, "軟件");
@@ -2778,12 +2778,12 @@ mod tests {
         }];
         let scanner = Scanner::new(rules, vec![]);
 
-        // 函式 follows 調用 — should fire.
+        // 函式 follows 調用: should fire.
         let issues = scanner.scan("請調用函式來處理").issues;
         assert_eq!(issues.len(), 1, "should fire when 函式 follows: {issues:?}");
         assert_eq!(issues[0].found, "調用");
 
-        // 函式 absent — should NOT fire.
+        // 函式 absent: should NOT fire.
         let issues = scanner.scan("請調用這個方法").issues;
         assert!(
             issues.is_empty(),
@@ -2800,11 +2800,11 @@ mod tests {
         }];
         let scanner = Scanner::new(rules, vec![]);
 
-        // 請 precedes 調用 — should fire.
+        // 請 precedes 調用: should fire.
         let issues = scanner.scan("請調用函式").issues;
         assert_eq!(issues.len(), 1, "should fire when 請 precedes: {issues:?}");
 
-        // 請 absent — should NOT fire.
+        // 請 absent: should NOT fire.
         let issues = scanner.scan("直接調用函式").issues;
         assert!(
             issues.is_empty(),
@@ -2821,7 +2821,7 @@ mod tests {
         }];
         let scanner = Scanner::new(rules, vec![]);
 
-        // 函式 immediately after 調用 — should fire.
+        // 函式 immediately after 調用: should fire.
         let issues = scanner.scan("調用函式").issues;
         assert_eq!(
             issues.len(),
@@ -2829,14 +2829,14 @@ mod tests {
             "should fire when 函式 is adjacent: {issues:?}"
         );
 
-        // Gap between them — should NOT fire.
+        // Gap between them: should NOT fire.
         let issues = scanner.scan("調用某個函式").issues;
         assert!(
             issues.is_empty(),
             "should not fire with gap between match and term: {issues:?}"
         );
 
-        // 函式 immediately before 調用 — should also fire (adjacent = either
+        // 函式 immediately before 調用: should also fire (adjacent = either
         // side).
         let issues = scanner.scan("函式調用方式").issues;
         assert_eq!(
@@ -2855,11 +2855,11 @@ mod tests {
         }];
         let scanner = Scanner::new(rules, vec![]);
 
-        // No 的 after — should fire.
+        // No 的 after: should fire.
         let issues = scanner.scan("這個項目進度超前").issues;
         assert_eq!(issues.len(), 1, "should fire without veto term: {issues:?}");
 
-        // 的 follows — should NOT fire.
+        // 的 follows: should NOT fire.
         let issues = scanner.scan("項目的名稱").issues;
         assert!(
             issues.is_empty(),
@@ -2876,11 +2876,11 @@ mod tests {
         }];
         let scanner = Scanner::new(rules, vec![]);
 
-        // 清單 absent — should fire.
+        // 清單 absent: should fire.
         let issues = scanner.scan("這個項目進度超前").issues;
         assert_eq!(issues.len(), 1, "should fire without veto term: {issues:?}");
 
-        // 清單 precedes — should NOT fire.
+        // 清單 precedes: should NOT fire.
         let issues = scanner.scan("清單項目需要確認").issues;
         assert!(
             issues.is_empty(),
@@ -2898,7 +2898,7 @@ mod tests {
         }];
         let scanner = Scanner::new(rules, vec![]);
 
-        // Both satisfied: 程式 in window AND 函式 after — should fire.
+        // Both satisfied: 程式 in window AND 函式 after, should fire.
         let issues = scanner.scan("這個程式調用函式").issues;
         assert_eq!(
             issues.len(),
@@ -2906,14 +2906,14 @@ mod tests {
             "should fire when both context and positional match: {issues:?}"
         );
 
-        // context_clues satisfied but positional NOT — should not fire.
+        // context_clues satisfied but positional NOT: should not fire.
         let issues = scanner.scan("這個程式調用方法").issues;
         assert!(
             issues.is_empty(),
             "positional fails, should not fire: {issues:?}"
         );
 
-        // positional satisfied but context_clues NOT — should not fire.
+        // positional satisfied but context_clues NOT: should not fire.
         let issues = scanner.scan("直接調用函式").issues;
         assert!(
             issues.is_empty(),
@@ -2975,14 +2975,14 @@ mod tests {
         }];
         let scanner = Scanner::new(rules, vec![]);
 
-        // 函式 is in the next paragraph — should NOT fire.
+        // 函式 is in the next paragraph: should NOT fire.
         let issues = scanner.scan("請調用方法\n\n函式定義在此").issues;
         assert!(
             issues.is_empty(),
             "before: must not match across paragraph break: {issues:?}"
         );
 
-        // 函式 is in the same paragraph — should fire.
+        // 函式 is in the same paragraph: should fire.
         let issues = scanner.scan("請調用函式").issues;
         assert_eq!(issues.len(), 1);
     }
@@ -2996,7 +2996,7 @@ mod tests {
         }];
         let scanner = Scanner::new(rules, vec![]);
 
-        // 請 is in the previous paragraph — should NOT fire.
+        // 請 is in the previous paragraph: should NOT fire.
         let issues = scanner.scan("請看這裡\n\n調用方法").issues;
         assert!(
             issues.is_empty(),
@@ -3013,7 +3013,7 @@ mod tests {
         }];
         let scanner = Scanner::new(rules, vec![]);
 
-        // 函式 is inside a code span — positional window should stop at the
+        // 函式 is inside a code span: positional window should stop at the
         // excluded range boundary, so the clue is invisible.
         let md_text = "調用`函式`來處理";
         let issues = scanner
@@ -3024,7 +3024,7 @@ mod tests {
             "before: must not see text inside code spans: {issues:?}"
         );
 
-        // Same text without code span — should fire.
+        // Same text without code span: should fire.
         let plain_text = "調用函式來處理";
         let issues = scanner
             .scan_for_content_type(plain_text, ContentType::Markdown, Profile::Base)
@@ -3045,7 +3045,7 @@ mod tests {
         }];
         let scanner = Scanner::new(rules, vec![]);
 
-        // 函式 inside a code span (Markdown) — adjacent should not match.
+        // 函式 inside a code span (Markdown): adjacent should not match.
         let md_text = "調用`函式`";
         let issues = scanner
             .scan_for_content_type(md_text, ContentType::Markdown, Profile::Base)

@@ -599,7 +599,7 @@ fn scanner_fires_yunxing_in_software_context() {
     );
 }
 
-// 14.4: CS Terminology — 參數 must NOT be flagged (correct zh-TW for parameter)
+// 14.4: CS Terminology, 參數 must NOT be flagged (correct zh-TW for parameter)
 
 #[test]
 fn parameter_canshu_not_flagged() {
@@ -653,7 +653,7 @@ fn macro_hong_requires_macro_clue() {
 
 #[test]
 fn macro_hong_skips_hongguan() {
-    // 宏觀 = macroscopic — NOT a programming macro
+    // 宏觀 = macroscopic: NOT a programming macro
     let scanner = full_scanner();
     let issues = scanner.scan("宏觀經濟學是重要的學科").issues;
     assert!(
@@ -668,7 +668,7 @@ fn macro_hong_skips_hongguan() {
 
 #[test]
 fn macro_hong_skips_hongwei() {
-    // 宏偉 = grand/imposing — NOT a programming macro
+    // 宏偉 = grand/imposing: NOT a programming macro
     let scanner = full_scanner();
     let issues = scanner.scan("這是一座宏偉的建築").issues;
     assert!(
@@ -683,7 +683,7 @@ fn macro_hong_skips_hongwei() {
 
 #[test]
 fn macro_hong_skips_huihong() {
-    // 恢宏 = magnificent — 宏 at position 1, not position 0
+    // 恢宏 = magnificent: 宏 at position 1, not position 0
     let scanner = full_scanner();
     let issues = scanner.scan("氣勢恢宏的場面").issues;
     assert!(

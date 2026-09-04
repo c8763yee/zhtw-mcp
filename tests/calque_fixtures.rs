@@ -1,8 +1,8 @@
 // Fixture-driven integration suite for the EN→ZH calque detectors (ZY1a / ZY1b
 // / ZY2a / ZY2b / ZY3a / ZY3b / ZY4a / ZY5).
 //
-// Each fixture in `tests/fixtures/calque/` carries a stable ID in its
-// filename: `calque_<rfN>_<detector>_<bad|good|solo>_<NNN>.txt`.  Bad
+// Each fixture in tests/fixtures/calque/ carries a stable ID in its
+// filename: "calque_<rfN>_<detector>_<bad|good|solo>_<NNN>.txt".  Bad
 // fixtures must fire the detector named in the filename (or its boundary-aware
 // sibling for ZY2 / ZY3 families, where post-scan dedup promotes boundary-aware
 // issues over their substring-only counterparts on the same span); good/solo
@@ -61,7 +61,7 @@ fn scan_fixture(text: &str) -> Vec<Issue> {
 /// Filename schema: `calque_<category>_<detector>_<bad|good|solo>_<NNN>.txt`,
 /// where `<category>` is one of `superlative`, `connective`,
 /// `nominalization`, `premodifier`, `falsefriend`, and `<detector>` is
-/// one of the registered tokens below.  Parsing is strict — unknown
+/// one of the registered tokens below.  Parsing is strict: unknown
 /// tokens (e.g. a future `zy1c`) return `None` so the test fails loudly
 /// instead of silently misclassifying as a known code.
 fn detector_in_id(filename: &str) -> Option<&'static str> {
@@ -152,7 +152,7 @@ fn calque_bad_fixtures_fire_their_detector() {
 #[test]
 fn calque_good_and_solo_fixtures_emit_zero_zy_issues() {
     // Substring-only good/solo fixtures must produce zero ZY issues across ALL
-    // detectors — they were designed so no substring-only pattern matches.
+    // detectors: they were designed so no substring-only pattern matches.
     // Boundary-aware good fixtures intentionally probe the sentence-bounded
     // check (ZY2b vs ZY2a, ZY3b vs ZY3a etc.); a substring-only detector with a
     // looser window may still fire on them, which is correct. For those we
@@ -278,10 +278,10 @@ fn calque_zy5_long_premodifier_pairs_present() {
 
 #[test]
 fn every_fixture_filename_resolves_to_known_detector() {
-    // The strict tokenizer is only enforced on `_bad_` fixtures via the
-    // unwrap_or_else panic in `calque_bad_fixtures_fire_their_detector`. The
-    // good/solo loop branches on `Option<&str>` and silently skips None, which
-    // would let a malformed filename drop coverage. Lock every `calque_*.txt`
+    // The strict tokenizer is only enforced on _bad_ fixtures via the
+    // unwrap_or_else panic in calque_bad_fixtures_fire_their_detector. The
+    // good/solo loop branches on Option<&str> and silently skips None, which
+    // would let a malformed filename drop coverage. Lock every calque_*.txt
     // filename into the strict parser here.
     let fixtures = read_fixtures(FIXTURE_PREFIX);
     assert!(!fixtures.is_empty(), "no calque_* fixtures discovered");

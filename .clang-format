@@ -1,0 +1,11 @@
+# The column limit commentflow reflows source comments to, and the only reason
+# this file exists: there is no C or C++ in this tree. commentflow reads
+# ColumnLimit from the nearest .clang-format, walking upward from each file, so
+# without one here the walk leaves the repository and the limit becomes whatever
+# a parent directory happens to say, or the built-in default when it says
+# nothing. Neither is a value this project chose.
+#
+# 80 rather than the 100 rustfmt allows for code. Prose reads narrower than
+# code, every comment in this tree is already at 80, and moving the number
+# reflows all nine thousand of them.
+ColumnLimit: 80

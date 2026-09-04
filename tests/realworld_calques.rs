@@ -58,8 +58,8 @@ fn assert_term_fires(issues: &[Issue], line: usize, expected_english: &str) {
 
 fn assert_term_silent(issues: &[Issue], line: usize, forbidden_from: &str) {
     // Match by containment, not equality: a regression where the scanner emits
-    // a longer phrase that contains the forbidden bare term (e.g. `好消息`
-    // slipping through as a phrase-level hit covering the inner `消息` calque)
+    // a longer phrase that contains the forbidden bare term (e.g. "好消息"
+    // slipping through as a phrase-level hit covering the inner "消息" calque)
     // would still violate the collocation invariant the test guards. Equality
     // would let those slip past.
     let line_issues = issues_on_line(issues, line);
@@ -84,7 +84,7 @@ fn phase1_high_frequency_terms_fire() {
 
     // Each (line, expected term) anchors a section in the fixture. Each anchor
     // is (line, expected english field on a CrossStrait issue covering some
-    // span of that line). Concept-level coverage — the longer compound rule is
+    // span of that line). Concept-level coverage: the longer compound rule is
     // allowed to win over the bare term as long as english anchors match.
     let anchors: &[(usize, &str)] = &[
         (10, "data"),
@@ -137,12 +137,12 @@ fn phase2_metadata_parent_rule_keeps_firing_with_english_anchor() {
         "元數據 rule must surface english anchor 'metadata' verbatim"
     );
 
-    // The 元數據 rule uses `to: []`, so `effective_suggestions` falls back to
-    // the english anchor. The user-visible suggestion must be exactly
-    // "metadata" — neither the rejected mainland form `元資料` nor the
-    // acceptable-but-not-preferred coinages `詮釋資料` / `後設資料`. Asserting
+    // The 元數據 rule uses "to: []", so effective_suggestions falls back to the
+    // english anchor. The user-visible suggestion must be exactly "metadata":
+    // neither the rejected mainland form "元資料" nor the
+    // acceptable-but-not-preferred coinages "詮釋資料" / "後設資料". Asserting
     // the suggestion list literally catches a regression where someone adds
-    // `to: ["後設資料"]` thinking it's a friendlier translation; the engine
+    // 'to: ["後設資料"]' thinking it's a friendlier translation; the engine
     // would surface that instead of "metadata", silently violating the gate.
     assert_eq!(
         parent.suggestions.as_ref(),
@@ -151,9 +151,9 @@ fn phase2_metadata_parent_rule_keeps_firing_with_english_anchor() {
         parent.suggestions,
     );
 
-    // Invariant: the inner 數據 hit must NOT double-fire on the same
-    // span — overlap resolution + the parent rule should yield exactly one
-    // issue covering the full 元數據 span.
+    // Invariant: the inner 數據 hit must NOT double-fire on the same span.
+    // Overlap resolution + the parent rule should yield exactly one issue
+    // covering the full 元數據 span.
     let inner_data: Vec<_> = line_31
         .iter()
         .filter(|i| {
@@ -192,7 +192,7 @@ fn phase2_metadata_rejected_form_is_flagged_symmetrically() {
 
 /// Three-tier metadata policy: the acceptable zh-TW alternatives
 /// `詮釋資料` and `後設資料` (NAER terminology) must NOT be flagged
-/// in writer prose — they are valid zh-TW forms even though
+/// in writer prose: they are valid zh-TW forms even though
 /// "metadata" is the preferred surface form.
 #[test]
 fn phase2_metadata_acceptable_forms_pass_through() {
@@ -250,7 +250,7 @@ fn phase3_bare_file_rule_remains_disabled() {
     );
 }
 
-/// Boundary — pure zh-TW forms must produce zero hits on these terms.
+/// Boundary: pure zh-TW forms must produce zero hits on these terms.
 #[test]
 fn boundary_pure_tw_forms_silent() {
     let body = std::fs::read_to_string(fixture_path()).expect("fixture exists");

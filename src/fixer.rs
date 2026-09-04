@@ -369,7 +369,7 @@ pub fn apply_fixes_with_context(
     };
 
     let mut applied_fixes = Vec::new();
-    // Byte position up to which we have already copied into `out`.
+    // Byte position up to which we have already copied into out.
     let mut cursor: usize = 0;
 
     // Byte position up to which grammar issues are declined because an
@@ -383,9 +383,9 @@ pub fn apply_fixes_with_context(
         // Reject an unusable span before anything else looks at it. Two reasons
         // it has to be first, not merely early. It is not a judgment, so it
         // must not reach a gate that records a decline. And the clue gate below
-        // slices `surrounding_window`, whose forward walk stops at `text.len()`
-        // without clamping `byte_end`, so an out-of-range `end` reaching it
-        // panics on a public entry point.
+        // slices surrounding_window, whose forward walk stops at text.len()
+        // without clamping byte_end, so an out-of-range end reaching it panics
+        // on a public entry point.
         let Some(end) = issue
             .offset
             .checked_add(issue.length)
@@ -1098,7 +1098,7 @@ mod tests {
         let offset = text.find("作為").unwrap();
         let issues = vec![make_ai_style_issue(offset, "作為", vec!["是"])];
         let result = apply_fixes(text, &issues, FixMode::Orthographic, &[]);
-        assert_eq!(result.text, text); // unchanged — AiStyle not orthographic
+        assert_eq!(result.text, text); // unchanged: AiStyle not orthographic
         assert_eq!(result.skipped, 1);
     }
 
@@ -1120,7 +1120,7 @@ mod tests {
         let offset = text.find("意味著").unwrap();
         let issues = vec![make_ai_style_issue(offset, "意味著", vec![])];
         let result = apply_fixes(text, &issues, FixMode::LexicalSafe, &[]);
-        assert_eq!(result.text, text); // unchanged — no suggestion
+        assert_eq!(result.text, text); // unchanged: no suggestion
         assert_eq!(result.skipped, 1);
     }
 

@@ -1,13 +1,13 @@
 // Composite three-axis style scorecard.
 //
-// Pure aggregation: AI-likelihood, translationese density, regional
-// density.  Three orthogonal scores, NEVER collapsed into a single
-// number: the consumer chooses which axis to act on.
+// Pure aggregation: AI-likelihood, translationese density, regional density.
+// Three orthogonal scores, NEVER collapsed into a single number: the consumer
+// chooses which axis to act on.
 //
-// No new detectors, no scoring-module changes — this module reads
-// `AiSignatureReport`, `TranslationeseReport`, and the issue list, then
-// emits a flat scorecard.  Wired by the CLI `--detect-style` path and the
-// MCP `detect_style` parameter.
+// No new detectors, no scoring-module changes: this module reads
+// AiSignatureReport, TranslationeseReport, and the issue list, then emits a
+// flat scorecard. Wired by the CLI --detect-style path and the MCP detect_style
+// parameter.
 
 use serde::{Deserialize, Serialize};
 
@@ -17,7 +17,7 @@ use crate::rules::ruleset::{Issue, IssueType, Severity};
 
 /// Three orthogonal style scores.  Each axis is `Option<f32>`: `None`
 /// means the axis was not computed (e.g. AI detection disabled).  Values
-/// are in [0.0, 1.0] but each axis carries its own meaning — they are
+/// are in [0.0, 1.0] but each axis carries its own meaning: they are
 /// presented side by side, never averaged.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct StyleScores {
@@ -122,7 +122,7 @@ fn compute_regional_density(issues: &[Issue], text_chars: usize) -> f32 {
 }
 
 /// Top ≤5 issues per axis, ordered by severity (Error > Warning > Info)
-/// then by line.  No ranking signal beyond severity — this is a triage
+/// then by line.  No ranking signal beyond severity: this is a triage
 /// list, not a ranking.
 fn top_issues_per_axis(issues: &[Issue]) -> TopIssuesPerAxis {
     let mut out = TopIssuesPerAxis::default();

@@ -15,7 +15,7 @@
 //
 // Run: cargo run --release --bench startup
 //
-// The 50ms cold-start budget is checked against `server ready + first_scan`;
+// The 50ms cold-start budget is checked against "server ready + first_scan";
 // above it, prewarming the lazy first-hit structures during init pays off.
 //
 // Both budgets exit non-zero when missed. They print as well, but printing was

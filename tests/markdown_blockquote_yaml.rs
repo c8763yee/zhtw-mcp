@@ -1,9 +1,9 @@
-// Markdown blockquote exemption (opt-in) and YAML scalar quote
-// preservation (always-on).
+// Markdown blockquote exemption (opt-in) and YAML scalar quote preservation
+// (always-on).
 //
 // Both behaviors are anchored to the ai-muninn.com calque blindspot sweep
 // (2026-05): citation contexts produce ~50 false positives, and auto-converting
-// `"` to `「`/`」` inside YAML frontmatter scalar values breaks downstream
+// '"' to "「"/"」" inside YAML frontmatter scalar values breaks downstream
 // parsers.
 
 use zhtw_mcp::engine::scan::{ContentType, Scanner};
@@ -157,7 +157,7 @@ fn blockquote_exempt_silences_citations() {
     );
 }
 
-/// Blockquote exemption only affects blockquotes — body prose still scans.
+/// Blockquote exemption only affects blockquotes: body prose still scans.
 #[test]
 fn blockquote_exempt_keeps_body_scanning() {
     let md = "用戶介面在正文裡也應該被覆蓋：用戶帳號要用使用者帳號。\n\n> 用戶輸入需要驗證。\n";
@@ -206,7 +206,7 @@ description: '使用者體驗指南'
 ";
     let issues = scan_with(md, false);
 
-    // No punctuation issue should fire on the ASCII `\"` bytes inside the
+    // No punctuation issue should fire on the ASCII '\"' bytes inside the
     // frontmatter scalar values.
     let punct_quote_hits: Vec<_> = issues
         .iter()
@@ -243,7 +243,7 @@ title: \"用戶手冊\"
         .filter(|i| matches!(i.rule_type, IssueType::Punctuation) && i.found == "\"")
         .collect();
 
-    // The body has two `\"` bytes (open + close) adjacent to CJK; both should
+    // The body has two '\"' bytes (open + close) adjacent to CJK; both should
     // fire the punctuation conversion suggestion.
     assert_eq!(
         body_quote_hits.len(),

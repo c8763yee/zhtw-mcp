@@ -113,7 +113,7 @@ impl super::Scanner {
             }
 
             // Single update point for prev, which is why the per-character
-            // checks live in a function instead of `continue`ing here.
+            // checks live in a function rather than a continue statement.
             prev = Some((offset, ch));
         }
     }
@@ -370,7 +370,7 @@ mod tests {
 
     #[test]
     fn mixed_exclamation_question_not_repeated() {
-        // ！？ are different punctuation marks — not "repeated".
+        // ！？ are different punctuation marks: not "repeated".
         let issues = spacing_issues("真的嗎！？");
         assert!(
             !issues.iter().any(|(c, _)| c.contains("不重複")),
@@ -400,7 +400,7 @@ mod tests {
 
     #[test]
     fn double_ellipsis_ok() {
-        // …… (exactly 2) is standard zh-TW form — should NOT be flagged.
+        // …… (exactly 2) is standard zh-TW form: should NOT be flagged.
         let issues = spacing_issues("他說……算了");
         assert!(
             !issues.iter().any(|(c, _)| c.contains("不重複")),
@@ -410,7 +410,7 @@ mod tests {
 
     #[test]
     fn triple_ellipsis_flagged() {
-        // ……… (3+) is non-standard — should be flagged.
+        // ……… (3+) is non-standard: should be flagged.
         let issues = spacing_issues("他說………算了");
         assert!(
             issues.iter().any(|(c, _)| c.contains("不重複")),
@@ -420,7 +420,7 @@ mod tests {
 
     #[test]
     fn double_em_dash_ok() {
-        // —— (exactly 2) is standard zh-TW form — should NOT be flagged.
+        // —— (exactly 2) is standard zh-TW form: should NOT be flagged.
         let issues = spacing_issues("他——就是那個人");
         assert!(
             !issues.iter().any(|(c, _)| c.contains("不重複")),
@@ -430,7 +430,7 @@ mod tests {
 
     #[test]
     fn triple_em_dash_flagged() {
-        // ——— (3+) is non-standard — should be flagged.
+        // ——— (3+) is non-standard: should be flagged.
         let issues = spacing_issues("他———就是那個人");
         assert!(
             issues.iter().any(|(c, _)| c.contains("不重複")),
@@ -508,7 +508,7 @@ mod tests {
 
     #[test]
     fn fullwidth_punct_then_space_then_fullwidth_punct() {
-        // ， ？ — space between two fullwidth puncts. Rule 3 space-after-punct
+        // ， ？: space between two fullwidth puncts. Rule 3 space-after-punct
         // only fires if after_ch is CJK/alphanumeric, not another punct.
         let issues = spacing_issues("好， ？");
         assert!(
@@ -521,8 +521,8 @@ mod tests {
 
     #[test]
     fn punct_run_resets_after_non_punct() {
-        // ！好！ — the second ！ should not be flagged as repeated because a
-        // CJK char intervenes, resetting same_punct_run.
+        // ！好！: the second ！ should not be flagged as repeated because a CJK
+        // char intervenes, resetting same_punct_run.
         let issues = spacing_issues("太棒！好！");
         assert!(
             !issues.iter().any(|(c, _)| c.contains("不重複")),
@@ -532,7 +532,7 @@ mod tests {
 
     #[test]
     fn different_punct_not_repeated() {
-        // ，。 — different fullwidth punct chars should not trigger rule 4.
+        // ，。: different fullwidth punct chars should not trigger rule 4.
         let issues = spacing_issues("好，好。");
         assert!(
             !issues.iter().any(|(c, _)| c.contains("不重複")),
@@ -542,7 +542,7 @@ mod tests {
 
     #[test]
     fn single_char_text() {
-        // Single CJK character — no next char, no prev initially.
+        // Single CJK character: no next char, no prev initially.
         let issues = spacing_issues("好");
         assert!(
             issues.is_empty(),
@@ -570,7 +570,7 @@ mod tests {
 
     #[test]
     fn cjk_space_latin_space_cjk_correct() {
-        // Properly spaced: CJK SPACE Latin SPACE CJK — no issues.
+        // Properly spaced: CJK SPACE Latin SPACE CJK, no issues.
         let issues = spacing_issues("好 ABC 好");
         assert!(
             !issues.iter().any(|(c, _)| c.contains("中英文")),
@@ -610,7 +610,7 @@ mod tests {
 
     #[test]
     fn rule4_quadruple_ellipsis() {
-        // 4 consecutive ellipsis marks — run=1 is OK (paired), run=2 and 3
+        // 4 consecutive ellipsis marks: run=1 is OK (paired), run=2 and 3
         // flagged.
         let issues = spacing_issues("他說…………算了");
         let repeat_count = issues.iter().filter(|(c, _)| c.contains("不重複")).count();

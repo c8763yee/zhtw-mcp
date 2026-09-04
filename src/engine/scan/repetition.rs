@@ -235,7 +235,7 @@ fn scan_cjk_duplicates(text: &str, excluded: &[ByteRange], issues: &mut Vec<Issu
             if !all_cjk {
                 continue;
             }
-            // Check if the next `unit_len` chars match.
+            // Check if the next unit_len chars match.
             let matches = (0..unit_len).all(|k| chars[i + k].1 == chars[i + unit_len + k].1);
             if !matches {
                 continue;
@@ -328,8 +328,9 @@ fn scan_latin_duplicates(text: &str, excluded: &[ByteRange], issues: &mut Vec<Is
         if w2_end_max - w2_start < w1_len {
             continue;
         }
-        // Check that word2 == word1 (case-insensitive).
-        // Ensure we don't slice in the middle of a multi-byte char.
+
+        // Check that word2 == word1 (case-insensitive). Ensure we don't slice
+        // in the middle of a multi-byte char.
         if !text.is_char_boundary(w2_end_max) {
             i = w1_end;
             continue;
@@ -341,9 +342,10 @@ fn scan_latin_duplicates(text: &str, excluded: &[ByteRange], issues: &mut Vec<Is
             i = w1_end;
             continue;
         }
-        // Ensure word2 ends at a word boundary.  Check the next Unicode
-        // scalar (not just ASCII byte) so accented Latin chars like 'é' in
-        // "cacheé" correctly prevent a false match on "cache".
+
+        // Ensure word2 ends at a word boundary. Check the next Unicode scalar
+        // (not just ASCII byte) so accented Latin chars like 'é' in "cacheé"
+        // correctly prevent a false match on "cache".
         if w2_end_max < len {
             let rest = &text[w2_end_max..];
             if let Some(ch) = rest.chars().next() {
@@ -501,6 +503,7 @@ mod tests {
         let issues = scan("作業作業完成了");
         assert_eq!(issues.len(), 1);
         assert_eq!(issues[0].found, "作業作業");
+
         // 作業作業 reads as a duplicate here, but 研究研究 is grammar and the
         // two are indistinguishable without a dictionary, so neither is fixed.
         assert!(issues[0].suggestions.is_empty());
@@ -573,7 +576,8 @@ mod tests {
 
     #[test]
     fn latin_duplicate_not_partial_accented_word() {
-        // 'cacheé' is a longer word with accented char; 'cache cache' must not match.
+        // 'cacheé' is a longer word with accented char; 'cache cache' must not
+        // match.
         let issues = scan("cache cacheé data");
         assert!(
             issues.is_empty(),

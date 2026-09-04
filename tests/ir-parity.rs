@@ -256,8 +256,8 @@ fn ir_exception_suppresses_match() {
 
 #[test]
 fn ir_superstring_absorption() {
-    // Rule where one of the `to` entries contains `from` as a substring. When
-    // the surrounding text already has the correct superstring form, the rule
+    // Rule where one of the to entries contains from as a substring. When the
+    // surrounding text already has the correct superstring form, the rule
     // should not fire.
     let scanner = Scanner::new(
         vec![SpellingRule::new(
@@ -296,8 +296,8 @@ fn ir_deletion_extends_span_over_comma() {
     // The extended span should include the comma.
     let issue = &out.issues[0];
 
-    // The `found` field shows the matched phrase (without absorbed comma) but
-    // `length` covers the full deletion span including the comma.
+    // The found field shows the matched phrase (without absorbed comma) but
+    // length covers the full deletion span including the comma.
     assert_eq!(
         issue.found, "進行",
         "deletion found should be the rule's from pattern"

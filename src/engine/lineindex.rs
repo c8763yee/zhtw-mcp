@@ -1,8 +1,8 @@
 // Line/column position mapping for byte offsets.
 //
-// Pre-computes newline positions to efficiently convert byte offsets to
-// (line, col) coordinates. Column values use UTF-16 code units by default
-// (matching LSP spec), with optional UTF-32 (char index) mode.
+// Pre-computes newline positions to efficiently convert byte offsets to (line,
+// col) coordinates. Column values use UTF-16 code units by default (matching
+// LSP spec), with optional UTF-32 (char index) mode.
 
 /// Column encoding mode for position reporting.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -41,17 +41,18 @@ impl<'a> LineIndex<'a> {
 
     /// Fill `line` and `col` fields on a batch of issues whose offsets are
     /// already sorted ascending.  Single linear pass over the line-start
-    /// table -- avoids O(log n) binary search per issue.
+    /// table, which avoids an O(log n) binary search per issue.
     pub fn fill_line_col_sorted(
         &self,
         issues: &mut [crate::rules::ruleset::Issue],
         encoding: ColumnEncoding,
     ) {
         let mut line_idx = 0;
-        // Incremental column cursor: (byte_offset, col_count) from the
-        // last issue on the same line.  When the next issue is on the same
-        // line and at a later offset, we resume counting from the cursor
-        // instead of re-scanning from line start.
+
+        // Incremental column cursor: (byte_offset, col_count) from the last
+        // issue on the same line. When the next issue is on the same line and
+        // at a later offset, we resume counting from the cursor instead of
+        // re-scanning from line start.
         let mut cursor_byte: usize = 0;
         let mut cursor_col: usize = 0;
 
@@ -65,8 +66,8 @@ impl<'a> LineIndex<'a> {
             let line_byte_start = self.line_starts[line_idx];
             let offset = issue.offset.min(self.text.len());
 
-            // If cursor is on the same line and at or before this offset,
-            // count incrementally from cursor.  Otherwise reset from line start.
+            // If cursor is on the same line and at or before this offset, count
+            // incrementally from cursor. Otherwise reset from line start.
             let (scan_from, base_col) = if cursor_byte >= line_byte_start && cursor_byte <= offset {
                 (cursor_byte, cursor_col)
             } else {
@@ -166,7 +167,8 @@ mod tests {
         // Line 1: H(0) e(1) l(2) l(3) o(4) ' '(5) 你(6) 好(9)
         assert_eq!(idx.line_col(6, ColumnEncoding::Utf16), (1, 7)); // 你
         assert_eq!(idx.line_col(9, ColumnEncoding::Utf16), (1, 8)); // 好
-                                                                    // Line 2 starts at byte 13 (\n at 12)
+
+        // Line 2 starts at byte 13 (\n at 12)
         assert_eq!(idx.line_col(13, ColumnEncoding::Utf16), (2, 1)); // W
     }
 

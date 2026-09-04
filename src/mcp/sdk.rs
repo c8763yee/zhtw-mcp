@@ -5,6 +5,19 @@
 //! error across to RMCP's shape, and flush whatever it logged. Everything the
 //! wire sees is built in `tools.rs` as RMCP model types, so this module holds
 //! no wire format of its own.
+//!
+//! Six `#[allow(deprecated)]` sit in here, and they are one decision rather
+//! than six. MCP SEP-2577 deprecates sampling, logging notifications, and
+//! roots; rmcp marked them deprecated in 1.8.0 and its notes name no successor,
+//! because the capabilities are being removed rather than renamed. The clients
+//! this server serves still use sampling and logging, so dropping them would be
+//! a silent feature removal, and the allows are what keeps a warning-free build
+//! while they stay wired.
+//!
+//! The exit condition is not a date. rmcp is pinned to major 3 in `Cargo.toml`,
+//! and the release that removes these will not be a 3.x, so the next major bump
+//! is where this gets revisited: either the clients have moved by then, or the
+//! bump waits until they have.
 
 use std::sync::{Arc, Mutex, PoisonError};
 
@@ -144,8 +157,8 @@ impl SdkServer {
         }
         if super::revisions::logging_opt_in(&ctx.meta) {
             // Framed onto the transport's own queue rather than sent through
-            // the peer. RMCP never saw an `initialize` on this connection, and
-            // a notification handed to that peer waits on a session that will
+            // the peer. RMCP never saw an initialize on this connection, and a
+            // notification handed to that peer waits on a session that will
             // never open: the send is accepted and the future that resolves
             // when it reaches the wire never does, which parks the request
             // forever with no reply and no exit. The queue is the same wire
@@ -365,12 +378,11 @@ impl ServerHandler for SdkServer {
         // Answered with the revision asked for, set here rather than left to
         // the service: RMCP patches the negotiated version onto the result only
         // when the session began with this handshake. A session that opened
-        // with `server/discover` and then sent `initialize` takes a different
-        // path, and the reply went out naming `get_info`'s default instead of
-        // the version requested. That is the same "which of the two is in
-        // force?" the refusal above exists to avoid. The version is already
-        // checked against the negotiable list, so there is nothing further to
-        // validate.
+        // with server/discover and then sent initialize takes a different path,
+        // and the reply went out naming get_info's default instead of the
+        // version requested. That is the same "which of the two is in force?"
+        // the refusal above exists to avoid. The version is already checked
+        // against the negotiable list, so there is nothing further to validate.
         Ok(self.get_info().with_protocol_version(negotiated))
     }
 
@@ -424,7 +436,7 @@ impl ServerHandler for SdkServer {
         let inner = self.inner.clone();
 
         // 2026-07-28 has no handshake to record the client at, so the identity
-        // rides in this request's `_meta` instead: it picks the default output
+        // rides in this request's _meta instead: it picks the default output
         // mode, and a call that never learns who is asking answers an agent
         // client in full where it had been answering compact. Handed to the
         // call rather than stored on the server, because the declaration is
@@ -567,16 +579,16 @@ impl ServerHandler for SdkServer {
         request: CustomRequest,
         _: RequestContext<RoleServer>,
     ) -> Result<CustomResult, ErrorData> {
-        // `shutdown` never reaches here: the framing layer answers it, so the
+        // shutdown never reaches here: the framing layer answers it, so the
         // flag it sets is in place before the next envelope is read.
         //
         // Anything else landing here is either a method this server does not
         // have, or one it does have whose params failed to deserialize:
-        // `ClientRequest` is untagged with `CustomRequest` last, so a
-        // `tools/call` whose params are the wrong shape falls through to here
-        // rather than being rejected as a typed request. Answering
-        // METHOD_NOT_FOUND for the second kind tells a client its tool does not
-        // exist when the tool exists and the arguments are wrong.
+        // ClientRequest is untagged with CustomRequest last, so a tools/call
+        // whose params are the wrong shape falls through to here rather than
+        // being rejected as a typed request. Answering METHOD_NOT_FOUND for the
+        // second kind tells a client its tool does not exist when the tool
+        // exists and the arguments are wrong.
         if IMPLEMENTED_METHODS.contains(&request.method.as_ref()) {
             return Err(ErrorData::invalid_params(
                 format!("invalid parameters for {}", request.method),
@@ -646,9 +658,9 @@ mod tests {
 
     #[test]
     fn a_panicked_handler_does_not_cost_the_judgment_cache() {
-        // `try_lock` reports a poisoned lock as an error even when nothing
-        // holds it, so reading every error as "a scan is in flight" threw the
-        // flush away for the rest of the process once any handler panicked.
+        // try_lock reports a poisoned lock as an error even when nothing holds
+        // it, so reading every error as "a scan is in flight" threw the flush
+        // away for the rest of the process once any handler panicked.
         let (inner, _dir) = test_server();
         poison(&inner);
         assert_eq!(flush_before_exit(&inner), Flushed::Yes);
@@ -658,7 +670,7 @@ mod tests {
     fn a_scan_in_flight_is_left_to_finish_without_the_flush() {
         // The other half, and it is about contention alone: a lock genuinely
         // held is what the warning is for. Poisoning it as well would pass only
-        // because `try_lock` reports contention ahead of poison.
+        // because try_lock reports contention ahead of poison.
         let (inner, _dir) = test_server();
         let _held = inner.lock().expect("a fresh lock is not poisoned");
         assert_eq!(flush_before_exit(&inner), Flushed::SkippedForScanInFlight);
@@ -667,9 +679,9 @@ mod tests {
     #[test]
     fn an_unadvertised_method_is_not_listed_as_implemented() {
         // The list is maintained by hand, and this is the entry that costs
-        // something when it drifts. `completion/complete` is refused because
-        // the `completions` capability is unadvertised; listing it here would
-        // make the same method answer method-not-found on good parameters and
+        // something when it drifts. completion/complete is refused because the
+        // completions capability is unadvertised; listing it here would make
+        // the same method answer method-not-found on good parameters and
         // invalid-params on bad ones, which is the bug the list exists to
         // prevent rather than one it should introduce.
         assert!(
@@ -697,7 +709,7 @@ mod tests {
     /// tests script their canned replies: a shape a real client could send is
     /// then a shape this test can build.
     // Deprecated by SEP-2577 along with the sampling API this exercises; the
-    // allow matches the one on `reply_text` itself.
+    // allow matches the one on reply_text itself.
     #[allow(deprecated)]
     fn sampling_reply(blocks: &[&str]) -> rmcp::model::CreateMessageResult {
         let content: Vec<_> = blocks

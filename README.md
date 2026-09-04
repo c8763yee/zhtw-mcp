@@ -159,6 +159,56 @@ make
 
 The binary is at `target/release/zhtw-mcp`.
 
+Python 3 is a build requirement, not just a test requirement: the OpenCC
+conversion tables are generated rather than committed.
+
+### Working on the code
+
+```bash
+make check           # the gate CI runs: tests, clippy, formatting, hooks
+make indent          # run the formatters; the gate checks their result
+make hooks           # install the git hooks; uninstall-hooks removes them
+make corpus          # precision, recall and false-positive metrics
+```
+
+`scripts/indent.sh` holds the formatter chain: comment reflow with
+`commentflow`, then `cargo fmt`, `black`, `shfmt`, and the `assets/ruleset.json`
+normalization that `scripts/check-ruleset.py` owns. `make indent` runs it with
+`--write` and the gate runs it with `--check`, against a copy of the tree so a
+check never rewrites what it is judging. The chain runs to a fixed point, since
+reindenting a block can invalidate the wrap of a comment inside it.
+
+No formatter here is passed a style flag. `shfmt` takes its settings from
+`.editorconfig` and `commentflow` takes its column limit from `.clang-format`,
+which exists only for that number: comments wrap at 80 while `rustfmt` allows
+code 100.
+
+Every lane reports that it skipped rather than failing when its tool is missing,
+which is why a green local run is weaker evidence than a green CI run. CI
+installs `commentflow`, `shfmt` and `shellcheck` on the Linux leg and sets
+`ZHTW_REQUIRE_TOOLS=1` there, which turns a skip into a failure.
+
+Any `cargo build` installs the git hooks, through `build.rs`, and `make hooks`
+does it on its own. A configured `core.hooksPath` is left untouched, since it
+may be shared by unrelated repositories. The pre-commit hook runs `rustfmt`, `black`, `shellcheck`,
+`shfmt`, `commentflow` and the ruleset checks over a checkout of the index, so
+an unstaged edit neither fails a commit nor rides along in one. The commit-msg
+hook holds the subject to 50 columns and the body to 72, imperative and free of
+em dashes, counting a CJK character as the two columns a terminal spends on
+it. The pre-push hook replays
+those rules over commits a rebase or an amend rewrote, and CI runs the same
+script over a pull request's own commits, so the rules bind a contributor who
+never installed the hooks as well.
+
+`scripts/check-comments.sh` holds source comments to the two prose rules no
+formatter knows about: no em dash, and no backtick outside a `///` or `//!` doc
+comment, where backticks are rustdoc markup rather than prose. It runs in the
+gate and in the pre-commit hook.
+
+`scripts/test-git-hooks.sh` drives all four hooks against a scratch repository
+and runs in the gate, so a hook that stops rejecting fails there rather than on
+somebody's next commit.
+
 ### Installing
 
 The quickest way to build, install to `$XDG_BIN_HOME` (or `~/.local/bin`),
