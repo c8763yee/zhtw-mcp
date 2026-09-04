@@ -1,4 +1,4 @@
-use std::io::Read;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process;
 
@@ -54,10 +54,10 @@ fn run(cli: Cli) -> Result<()> {
     let packs_dir = packs_dir.unwrap_or_else(zhtw_mcp::rules::store::default_packs_dir);
 
     match command {
-        Command::Help(topic) => {
-            print!("{}", help_text(topic));
-            Ok(())
-        }
+        Command::Help(topic) => match std::io::stdout().write_all(help_text(topic).as_bytes()) {
+            Err(e) if e.kind() != std::io::ErrorKind::BrokenPipe => Err(e.into()),
+            _ => Ok(()),
+        },
 
         // Setup subcommand: generate integration config for a host editor.
         Command::Setup(host) => {
