@@ -59,6 +59,14 @@ These standards are enforced through two profiles on the strictness axis, plus o
 | `relaxed` | Relaxed for software UI: disables colon/dunhao enforcement and grammar checks; uses en-dash for ranges |
 | `detect_ai` | AI writing review: filler phrase detection, semantic safety words, copula/passive voice checks, density-based pattern detection |
 
+For unsupported authority attributions, select `document_genre` in MCP or
+`--document-genre casual|technical|financial` in the CLI. The check runs only
+with AI detection on (`--detect-ai` / `detect_ai`), and never suggests an edit
+in any genre: deleting an attribution changes what the sentence claims, so the
+genre selects the advice rather than a rewrite. Casual prose is told to name
+the source or drop the appeal; technical and financial prose are told the
+claim needs a citation.
+
 Profiles control how strict the zh-TW norm enforcement is. Flags are orthogonal -- `detect_ai` works with either profile, `relaxed` can combine with `strict` if you want variant normalization but lenient punctuation.
 
 See [docs/rules.md](docs/rules.md) for the full rule reference.

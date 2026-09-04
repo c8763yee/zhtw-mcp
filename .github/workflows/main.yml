@@ -36,6 +36,9 @@ jobs:
 
     steps:
     - uses: actions/checkout@v7
+      with:
+        # The ruleset provenance check reads the PR base revision.
+        fetch-depth: 0
 
     - name: Install Rust toolchain
       run: rustup toolchain install stable --profile minimal --component rustfmt,clippy
@@ -59,6 +62,11 @@ jobs:
 
     - name: make check
       if: matrix.os != 'windows-2025'
+      env:
+        # The provenance gate compares against the revision before the change.
+        # workflow_dispatch has neither a PR base nor a push's before SHA, and
+        # leaves this empty; the Makefile maps an empty value to HEAD.
+        RULESET_BASELINE: ${{ github.event.pull_request.base.sha || github.event.before }}
       run: make check
 
     # `make` is not dependable on the Windows runner (see build-latest's

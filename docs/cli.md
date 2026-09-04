@@ -116,6 +116,22 @@ An unclosed block runs to the end of the file. An unrecognized keyword suppresse
 
 In lint-only mode (no `--fix`), the CLI automatically caches scan results keyed by file content hash (BLAKE3) and scan parameters. Unchanged files are skipped on subsequent runs. The cache lives at the platform default cache directory (`~/.cache/zhtw-mcp/` on Linux, `~/Library/Caches/zhtw-mcp/` on macOS) with 24-hour TTL and a 2000-entry cap. Caching is disabled when `--fix`, `--verify`, or stdin mode is active.
 
+## Network access and `ZHTW_NO_NETWORK`
+
+`zhtw-mcp` is local-only except for `--verify`, which sends the sentence around
+each finding over HTTPS to Google Translate to confirm a flagged term carries
+the meaning its rule claims. Set `ZHTW_NO_NETWORK` to any value other than
+empty or `0` to refuse it:
+
+```bash
+ZHTW_NO_NETWORK=1 zhtw-mcp lint --verify README.md   # exits non-zero, naming the flag
+ZHTW_NO_NETWORK=1 zhtw-mcp lint README.md            # unaffected
+```
+
+The run fails rather than quietly linting without the verification that was
+asked for. The switch covers `lint --verify` and `convert --verify`; ordinary
+linting, fixing and converting never touch the network.
+
 ## Telemetry
 
 Use `--telemetry` with `lint` to print a compact stderr summary after the run:

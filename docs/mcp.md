@@ -59,6 +59,7 @@ Unified lint / fix / gate for zh-TW text.
 | `explain` | boolean | Attach cultural/linguistic annotations |
 | `output` | `"full"` / `"compact"` / `"tabular"` / `"summary"` | Output verbosity |
 | `include_telemetry` | boolean | Include estimated token, cache, and Tier 2 resolution metrics in JSON responses (`full`, `compact`, `summary`) |
+| `verify` | boolean | Anchor-verify findings via Google Translate. Requires the `translate` feature (on by default) and sends text off the machine: see [Network access](#network-access-and-zhtw_no_network) below |
 
 Lint only (default):
 
@@ -105,6 +106,32 @@ Summary output:
 ```
 
 Returns aggregate counts only, plus any available document-level metadata such as `coverage`, `oral_density`, `quality_flags`, and `ai_signature`.
+
+## Network access and `ZHTW_NO_NETWORK`
+
+Everything the server does is local except one tool argument. Passing
+`verify: true` runs anchor calibration, which extracts the sentence around each
+finding and sends those excerpts over HTTPS to Google Translate
+(`translate.googleapis.com`) to check that a flagged term really carries the
+meaning the rule claims. Nothing else in the server opens a socket, and the
+argument defaults to `false`.
+
+That matters more here than in the CLI, because under MCP the decision to pass
+`verify` is made by a model rather than by the person whose document is being
+linted. Set `ZHTW_NO_NETWORK` to refuse it:
+
+```bash
+ZHTW_NO_NETWORK=1 zhtw-mcp
+```
+
+A `verify: true` call is then rejected before any scanning happens, with
+`data.reason` set to `network_disabled`, so a caller can tell the refusal apart
+from an ordinary argument error and retry without it. Any value other than
+empty or `0` enables the switch. Everything else keeps working: the switch
+governs egress, not linting, and the server is fully functional offline.
+
+Build with `--no-default-features --features native` to remove the calibration
+code entirely, at the cost of also dropping the `verify` argument.
 
 ## Resources
 
