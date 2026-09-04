@@ -194,16 +194,54 @@ fn lint_help_needs_no_file_argument_and_wins_over_files() {
     assert!(stdout.starts_with("zhtw-mcp lint - "));
 }
 
+/// The names in the Hosts section of setup help, sorted.
+///
+/// The section runs from the Hosts heading to the next blank line.  A name is
+/// followed either by a comma or, where the entry carries a description, by
+/// the run of spaces that separates the two columns.
+fn listed_hosts(help: &str) -> Vec<&str> {
+    help.lines()
+        .skip_while(|line| line.trim() != "Hosts:")
+        .skip(1)
+        .take_while(|line| !line.trim().is_empty())
+        .flat_map(|line| line.trim().split("  ").next().unwrap_or("").split(','))
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+        .collect::<std::collections::BTreeSet<_>>()
+        .into_iter()
+        .collect()
+}
+
 #[test]
 fn setup_help_lists_every_host_run_setup_accepts() {
-    // The host list is static text in docs/cli.md now, so this is what keeps
-    // it in step with setup::ALL_HOSTS.
+    // Both directions, because each failure hurts a different person.  A host
+    // the help omits is a host nobody finds; a host the help names and setup
+    // rejects wastes the time of somebody who followed the instructions.
+    //
+    // ALL_HOSTS carries the canonical spellings, and translation-guide is
+    // handled ahead of them in main.rs, so the expected set is the two
+    // together.  Aliases such as claude-code and translation_guide stay
+    // unlisted on purpose: from_name accepts several spellings per host and
+    // the help names one.
     let stdout = help_stdout(&["setup", "--help"]);
-    for host in zhtw_mcp::mcp::setup::ALL_HOSTS {
+    let listed = listed_hosts(&stdout);
+
+    let mut expected: Vec<&str> = zhtw_mcp::mcp::setup::ALL_HOSTS
+        .iter()
+        .map(|host| host.name())
+        .chain(std::iter::once("translation-guide"))
+        .collect();
+    expected.sort_unstable();
+    assert_eq!(listed, expected, "setup help lists the wrong hosts");
+
+    // Run each one rather than trusting from_name: the guide is dispatched
+    // before from_name is ever reached, so only the binary answers for it.
+    for host in listed {
+        let output = run(&["setup", host]);
         assert!(
-            stdout.contains(host.name()),
-            "setup help should list host '{}':\n{stdout}",
-            host.name()
+            output.status.success(),
+            "setup help lists '{host}', which setup rejects: {}",
+            String::from_utf8_lossy(&output.stderr)
         );
     }
 }
