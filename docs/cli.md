@@ -69,7 +69,8 @@ Options:
   --detect-style [level]    Both detectors plus a composite scorecard
                             (requires --format json)
   --verify                  Confirm ambiguous substitutions via online
-                            translation (sends text to the network)
+                            translation (sends text to the network,
+                            requires the translate feature)
   --telemetry               Print stderr summary counters after the run
   -h, --help                Show this help
 
@@ -330,12 +331,13 @@ normalize vocabulary.  Corrected output goes to stdout.
 
 Usage:
   zhtw-mcp convert <file>                  Convert a file
-  zhtw-mcp convert -- < input.txt          Convert stdin (default)
+  zhtw-mcp convert [--] < input.txt        Convert stdin (the default)
 
 Options:
   --content-type <ct>   plain, markdown, markdown-scan-code, or yaml
   --verify              Confirm ambiguous substitutions via online
-                        translation (sends text to the network)
+                        translation (sends text to the network,
+                        requires the translate feature)
   -h, --help            Show this help
 
 ```
