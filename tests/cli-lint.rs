@@ -1454,7 +1454,7 @@ fn cli_lint_detect_ai_enables_density_detection() {
 #[test]
 fn cli_lint_detect_style_emits_three_axis_scorecard() {
     // --detect-style produces a three-axis scorecard (ai / translationese /
-    // consistency). All three axes are reported side by side and never
+    // regional_density). All three axes are reported side by side and never
     // collapsed into a single number.
     let text = "策略的實施帶來了效率的提升。實際上基本上每個人都同意。\
                 這是 20 世紀最重要的發現之一。當我抵達公司的時候，他已經在開會了。";
@@ -1470,7 +1470,7 @@ fn cli_lint_detect_style_emits_three_axis_scorecard() {
         .get("style_scores")
         .expect("style_scorecard.style_scores present");
     // Three orthogonal axes: at least one of the three carries a score.
-    let has_any = ["ai", "translationese", "consistency"]
+    let has_any = ["ai", "translationese", "regional_density"]
         .iter()
         .any(|axis| scores.get(*axis).is_some());
     assert!(has_any, "scorecard must emit at least one axis");
@@ -1478,9 +1478,9 @@ fn cli_lint_detect_style_emits_three_axis_scorecard() {
     // Three scores are reported as separate fields — not combined.
     let ai = scores.get("ai");
     let trans = scores.get("translationese");
-    let consistency = scores.get("consistency");
+    let regional_density = scores.get("regional_density");
     assert!(
-        ai.is_some() || trans.is_some() || consistency.is_some(),
+        ai.is_some() || trans.is_some() || regional_density.is_some(),
         "axes reported individually, never collapsed"
     );
     // No top-level composite "score" / "overall" field.
@@ -1491,7 +1491,7 @@ fn cli_lint_detect_style_emits_three_axis_scorecard() {
     let top = scorecard
         .get("top_issues_per_axis")
         .expect("top_issues_per_axis present");
-    for axis in ["ai", "translationese", "consistency"] {
+    for axis in ["ai", "translationese", "regional_density"] {
         assert!(top.get(axis).is_some(), "top_issues_per_axis.{axis}");
     }
 }
@@ -1572,7 +1572,7 @@ fn cli_lint_detect_style_preserves_translationese_axis_after_baseline_filtering(
 }
 
 #[test]
-fn cli_lint_detect_style_preserves_consistency_on_cache_hits() {
+fn cli_lint_detect_style_preserves_regional_density_on_cache_hits() {
     let dir = tempfile::tempdir().unwrap();
     let file = dir.path().join("style-cache.txt");
     std::fs::write(&file, "這個軟件的服務器內存不夠").unwrap();
@@ -1590,20 +1590,21 @@ fn cli_lint_detect_style_preserves_consistency_on_cache_hits() {
     let second_json: serde_json::Value =
         serde_json::from_str(&second_stdout).expect("cached JSON output");
 
-    let first_consistency = first_json["style_scorecard"]["style_scores"]["consistency"]
+    let first_regional_density = first_json["style_scorecard"]["style_scores"]["regional_density"]
         .as_f64()
-        .expect("initial consistency score present");
-    let second_consistency = second_json["style_scorecard"]["style_scores"]["consistency"]
+        .expect("initial regional_density score present");
+    let second_regional_density = second_json["style_scorecard"]["style_scores"]
+        ["regional_density"]
         .as_f64()
-        .expect("cached consistency score present");
+        .expect("cached regional_density score present");
 
     assert!(
-        first_consistency > 0.0,
-        "fixture should trigger a non-zero consistency score: {first_stdout}"
+        first_regional_density > 0.0,
+        "fixture should trigger a non-zero regional_density score: {first_stdout}"
     );
     assert_eq!(
-        second_consistency, first_consistency,
-        "cache hits must preserve the same consistency score: {second_stdout}"
+        second_regional_density, first_regional_density,
+        "cache hits must preserve the same regional_density score: {second_stdout}"
     );
 }
 
@@ -1644,9 +1645,9 @@ fn cli_lint_detect_style_uses_post_fix_text_length() {
     let json: serde_json::Value = serde_json::from_str(&stdout).expect("post-fix JSON output");
     let final_text = std::fs::read_to_string(&file).unwrap();
     let expected = 1000.0 / (final_text.chars().count() as f64);
-    let got = json["style_scorecard"]["style_scores"]["consistency"]
+    let got = json["style_scorecard"]["style_scores"]["regional_density"]
         .as_f64()
-        .expect("consistency score present");
+        .expect("regional density present");
     assert!(
         (got - expected).abs() < 1e-6,
         "scorecard must use post-fix text length; expected {expected}, got {got}, stdout={stdout}"
@@ -1676,7 +1677,89 @@ fn cli_lint_translationese_suggested_rewrite_serialized() {
 }
 
 #[test]
+fn cli_lint_fix_never_deletes_an_attribution_from_native_prose() {
+    // The regression this pins: the bare-attribution check once shipped an
+    // empty-string suggestion, which is the fixer's delete sentinel, and it ran
+    // under "grammar_checks" rather than the AI filter. A plain "lint --fix" on
+    // ordinary Taiwanese reporting therefore rewrote
+    // "多位專家認為，本次修法將影響地方財政。" into
+    // "多位，本次修法將影響地方財政。"
+    let native = "研究顯示台灣中小企業的數位轉型速度落後。多位專家認為，本次修法將影響地方財政。";
+
+    // Without the AI filter the check must not run at all.
+    let plain = run_lint_stdin(&["--format", "json"], native);
+    let json: serde_json::Value =
+        serde_json::from_str(&String::from_utf8_lossy(&plain.stdout)).expect("JSON output");
+    assert!(
+        !json["issues"]
+            .as_array()
+            .expect("issues array")
+            .iter()
+            .any(|issue| issue["rule_type"] == "ai_style"),
+        "an AI-only check fired under a plain lint: {json}"
+    );
+
+    // With it on, the finding appears but carries no mechanical edit.
+    let ai = run_lint_stdin(&["--detect-ai", "--format", "json"], native);
+    let json: serde_json::Value =
+        serde_json::from_str(&String::from_utf8_lossy(&ai.stdout)).expect("JSON output");
+    let attributions: Vec<_> = json["issues"]
+        .as_array()
+        .expect("issues array")
+        .iter()
+        .filter(|issue| issue["found"] == "研究顯示" || issue["found"] == "專家認為")
+        .collect();
+    assert_eq!(attributions.len(), 2, "expected both attributions: {json}");
+    for issue in attributions {
+        let suggestions = issue["suggestions"].as_array().expect("suggestions array");
+        assert!(
+            suggestions.is_empty(),
+            "a bare attribution offered an edit: {issue}"
+        );
+    }
+
+    // The property the test is named for: run the fixer and require the text
+    // back unchanged. Asserting on the suggestion list alone would miss a
+    // deletion reintroduced through any other path.
+    let dir = tempfile::tempdir().expect("tempdir");
+    let path = dir.path().join("native.txt");
+    std::fs::write(&path, native).expect("write");
+    for args in [
+        vec!["--fix"],
+        vec!["--detect-ai", "--fix"],
+        vec!["--detect-ai", "--fix=lexical_contextual"],
+    ] {
+        std::fs::write(&path, native).expect("rewrite");
+        let p = path.to_string_lossy().into_owned();
+        let mut argv = args.clone();
+        argv.push(p.as_str());
+        run_lint_args(&argv);
+        let after = std::fs::read_to_string(&path).expect("read back");
+        assert_eq!(after, native, "--fix rewrote native prose with {args:?}");
+    }
+}
+
+#[test]
+fn cli_lint_ai_rewrite_hint_is_serialized() {
+    let output = run_lint_stdin(
+        &["--detect-ai", "--format", "json"],
+        "這個函式被廣泛使用，因此改動前要檢查相容性。",
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let json: serde_json::Value = serde_json::from_str(&stdout).expect("AI JSON output");
+    let issue = json["issues"]
+        .as_array()
+        .expect("issues array")
+        .iter()
+        .find(|issue| issue["found"] == "被廣泛使用")
+        .expect("passive AI-style issue present");
+    assert_eq!(issue["suggested_rewrite"], "廣泛使用");
+}
+
+#[test]
 fn cli_lint_writing_humanizer_watchlist_comprehensive() {
+    // 提升 and 增強 are absent on purpose: both are ordinary Taiwanese
+    // technical usage and are parked on the watchlist.
     let text = "此外，持久的制度與永恆的價值會增強信任並提升效率。\
         我們要培養能力、促進合作、涵養精神，留下寶貴的經驗。\
         這是一個充滿活力的場域，呈現相互作用與交織的關係。\
@@ -1698,8 +1781,6 @@ fn cli_lint_writing_humanizer_watchlist_comprehensive() {
         "此外",
         "持久的",
         "永恆的",
-        "增強",
-        "提升",
         "培養",
         "促進",
         "涵養",
@@ -1971,5 +2052,420 @@ fn cli_lint_editorial_confidence_gate_covers_a_shipped_rule() {
     assert!(
         fixed.contains("情境"),
         "lexical_contextual must apply it: {fixed}"
+    );
+}
+
+// The delete sentinel "to": [""] means "remove this span". It is only sound
+// when the span is a detachable discourse adjunct. For a predicate, a copula, a
+// head noun, or a modifier that leaves a degree adverb stranded, removing the
+// span produces ungrammatical zh-TW: 那是很寶貴的經驗 became 那是很經驗. Those
+// rules now carry an empty "to", so they report without rewriting.
+#[test]
+fn cli_fix_never_deletes_a_load_bearing_span() {
+    // Each of these must report and survive --fix intact. Asserting only that
+    // the text is unchanged would pass just as well if every filler rule
+    // stopped firing, so require the finding too: "reported, not rewritten" is
+    // the property, and half of it is invisible without this check.
+    let reported = [
+        "他在急診室待了二十年，那是很寶貴的經驗。",
+        "這款鏡頭可以說是這個價位帶最銳利的一支。",
+        "道理不言而喻，不必我多說。",
+        "無縫整合是它的賣點之一。",
+        "作為一個備援方案，它已經夠用了。",
+        "這件事眾所周知。",
+        "這一點毫無疑問。",
+        "這是一個好問題。",
+        "他提出非常棒的觀點。",
+        "你當然可以這樣做。",
+        "這一切都是為了實現這一目標。",
+        "讓我來為你介紹。",
+        "希望這對你有幫助。",
+        "您說得完全正確。",
+    ];
+    for input in reported {
+        let output = run_lint_stdin(&["--fix"], input);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert_eq!(
+            stdout.trim_end(),
+            input,
+            "--fix rewrote a load-bearing span in {input}"
+        );
+        let json = run_lint_stdin(&["--format", "json"], input);
+        let parsed: serde_json::Value =
+            serde_json::from_slice(&json.stdout).expect("lint --format json");
+        assert!(
+            !parsed["issues"]
+                .as_array()
+                .expect("issues array")
+                .is_empty(),
+            "no finding reported for {input}, so the no-rewrite assertion above proves nothing"
+        );
+    }
+
+    // The other half of the guard. All three carry a rule, but a clue-gated
+    // one: 理解了 needs 我們就能明白, 隨著 needs 快速發展, 在當今 needs 時代.
+    // These are the literal readings, carrying no clue, that the gate exists to
+    // spare. They must stay silent, not merely unrewritten.
+    let silent = [
+        "我理解了你的意思。",
+        "隨著時間過去，傷口慢慢癒合。",
+        "在當今的制度下，這條路走不通。",
+    ];
+    for input in silent {
+        let json = run_lint_stdin(&["--format", "json"], input);
+        let parsed: serde_json::Value =
+            serde_json::from_slice(&json.stdout).expect("lint --format json");
+        assert!(
+            parsed["issues"]
+                .as_array()
+                .expect("issues array")
+                .is_empty(),
+            "clue gate leaked on the literal reading in {input}"
+        );
+    }
+}
+
+// A word ending in 外 abuts the rules 外設/外置/外鍵. Without a segmentation
+// entry for the left-hand word the rule fires across the boundary and 額外設定
+// becomes 額硬體周邊定.
+#[test]
+fn cli_fix_does_not_split_a_word_ending_in_wai() {
+    let cases = [
+        "它不需要額外設定。",
+        "公司到海外設廠。",
+        "他們在國外設立分公司。",
+        "這場意外設計出新的流程。",
+        "格外設想周到。",
+        // Same class, other opening characters: 標 and 此 and 源.
+        "請看達標清單。",
+        "投標量很大。",
+        "他個性如此外向。",
+        "彼此外貌相似。",
+        "由此外推可得結論。",
+        "除此外還有三個選項。",
+        "請參閱來源文件的第三節。",
+        "電源文件放在機櫃旁邊。",
+    ];
+    for input in cases {
+        let output = run_lint_stdin(&["--fix"], input);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        assert_eq!(stdout.trim_end(), input, "--fix split a word in {input}");
+    }
+    // The genuine PRC terms still convert.
+    for (input, want) in [
+        ("購買外設鍵盤。", "購買硬體周邊鍵盤。"),
+        ("這是標清畫面。", "這是標準畫質畫面。"),
+        ("請參閱源文件。", "請參閱原始檔。"),
+    ] {
+        let output = run_lint_stdin(&["--fix"], input);
+        assert_eq!(String::from_utf8_lossy(&output.stdout).trim_end(), want);
+    }
+    // 此外 is reported but not deleted: one connective is ordinary zh-TW.
+    let output = run_lint_stdin(&["--fix", "--detect-ai"], "此外，還有三個選項。");
+    assert_eq!(
+        String::from_utf8_lossy(&output.stdout).trim_end(),
+        "此外，還有三個選項。"
+    );
+}
+
+// Reduplication is productive in Chinese, so a repeated one- or two-character
+// unit cannot be deleted without a dictionary: 研究研究 is grammar, not a
+// stutter. Those are reported without a suggestion.
+#[test]
+fn cli_fix_never_collapses_productive_reduplication() {
+    let cases = [
+        "這件事我們研究研究。",
+        "大家一起討論討論吧。",
+        "《茜茜公主》是經典。",
+        "整整一百年過去了。",
+        "錯字連連。",
+        "形形色色的人。",
+    ];
+    for input in cases {
+        let output = run_lint_stdin(&["--fix"], input);
+        assert_eq!(
+            String::from_utf8_lossy(&output.stdout).trim_end(),
+            input,
+            "--fix collapsed reduplication in {input}"
+        );
+    }
+    // A three-character unit is past the reach of reduplication.
+    let output = run_lint_stdin(&["--fix"], "處理器處理器效能高。");
+    assert_eq!(
+        String::from_utf8_lossy(&output.stdout).trim_end(),
+        "處理器效能高。"
+    );
+}
+// Converting one half of a bracket pair is worse than converting neither.
+#[test]
+fn cli_fix_keeps_bracket_pairs_matched() {
+    let output = run_lint_stdin(&["--fix"], "上海電影譯製廠(1957 成立)。");
+    assert_eq!(
+        String::from_utf8_lossy(&output.stdout).trim_end(),
+        "上海電影譯製廠(1957 成立)。"
+    );
+    let output = run_lint_stdin(&["--fix"], "這是中文(附註)說明。");
+    assert_eq!(
+        String::from_utf8_lossy(&output.stdout).trim_end(),
+        "這是中文（附註）說明。"
+    );
+}
+
+// A joiner the detector judged stray is reported, not deleted: the neighbour
+// test cannot see a word-final Malayalam chillu or a doubled Persian ZWNJ. ZWSP
+// has no such reading and is still stripped.
+#[test]
+fn cli_fix_strips_only_unambiguous_invisible_characters() {
+    let input = "\u{0D05}\u{0D35}\u{0D28}\u{0D4D}\u{200D} 走了。\u{200C}\u{200C}在這裡。";
+    let output = run_lint_stdin(&["--fix", "--detect-ai"], input);
+    assert_eq!(String::from_utf8_lossy(&output.stdout).trim_end(), input);
+
+    let output = run_lint_stdin(&["--fix", "--detect-ai"], "零寬\u{200B}空格。");
+    assert_eq!(
+        String::from_utf8_lossy(&output.stdout).trim_end(),
+        "零寬空格。"
+    );
+}
+
+// The invisible-character layer covers more than the six zero-width points it
+// started with: soft hyphen, CGJ, word joiner, invisible math operators, bidi
+// overrides, loose tag characters and noncharacters are all copy-paste or
+// watermark residue in zh-TW prose.
+#[test]
+fn cli_detects_the_wider_invisible_character_set() {
+    let text = "字\u{00AD}形\u{034F}測\u{2060}試\u{2062}與\u{202E}方向\u{FDD0}結束。";
+    let output = run_lint_stdin(&["--detect-ai", "--format", "json"], text);
+    let json: serde_json::Value =
+        serde_json::from_str(&String::from_utf8_lossy(&output.stdout)).expect("AI JSON output");
+    let hits = json["issues"]
+        .as_array()
+        .expect("issues array")
+        .iter()
+        .filter(|i| {
+            i["context"]
+                .as_str()
+                .is_some_and(|c| c.contains("隱形字元"))
+        })
+        .count();
+    assert_eq!(
+        hits,
+        6,
+        "stdout={}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+
+    // A flag tag sequence, an emoji ZWJ sequence and an ideographic variation
+    // selector are orthography, not residue.
+    let clean = "旗幟 \u{1F3F4}\u{E0067}\u{E0062}\u{E0073}\u{E0063}\u{E0074}\u{E007F} \
+                 與 \u{1F469}\u{1F3FB}\u{200D}\u{1F680} 和 葛\u{E0100} 都合法。";
+    let output = run_lint_stdin(&["--detect-ai"], clean);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        !stdout.contains("隱形字元"),
+        "flagged valid sequences: {stdout}"
+    );
+}
+
+// The MoE standard-form variants documented in docs/rules.md. 綫 was listed
+// there but never shipped, so the doc and the ruleset had drifted; these are
+// strict-profile rules, which is why a base-profile corpus cannot cover them.
+#[test]
+fn cli_lint_moe_variant_forms_fire_under_strict() {
+    let text = "這條綫路的裏面有一碗麪。";
+
+    // Reading from stdin keeps stdout for the document, so findings are on
+    // stderr.
+    let output = run_lint_stdin(&["--profile", "strict"], text);
+    let report = String::from_utf8_lossy(&output.stderr);
+    for want in ["綫", "裏", "麪"] {
+        assert!(report.contains(want), "missing {want} in {report}");
+    }
+    // Off by default, so ordinary linting does not rewrite an author's glyphs.
+    let output = run_lint_stdin(&[], text);
+    assert!(String::from_utf8_lossy(&output.stderr).contains("No issues"));
+}
+
+// The calibration layer is the only code in the crate that opens a socket, and
+// it sends sentence-sized excerpts of the linted document to Google. Under MCP
+// the decision to pass "verify" belongs to a model rather than to the person
+// whose text it is, so an operator needs a switch the caller cannot argue past.
+#[test]
+fn cli_no_network_env_refuses_verify() {
+    let bin = binary_path();
+    let run = |value: Option<&str>, args: &[&str]| -> Output {
+        let mut cmd = Command::new(&bin);
+        cmd.args(["lint", "--"])
+            .args(args)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .env_remove("RUST_LOG")
+            .env_remove("ZHTW_NO_NETWORK");
+        if let Some(v) = value {
+            cmd.env("ZHTW_NO_NETWORK", v);
+        }
+        let mut child = cmd.spawn().expect("spawn zhtw-mcp");
+        child
+            .stdin
+            .take()
+            .expect("stdin")
+            .write_all("這個軟件需要優化。".as_bytes())
+            .expect("write stdin");
+        child.wait_with_output().expect("collect output")
+    };
+
+    // Set: --verify is refused, by name, and the run fails rather than quietly
+    // linting without the verification that was asked for.
+    let blocked = run(Some("1"), &["--verify"]);
+    let stderr = String::from_utf8_lossy(&blocked.stderr);
+    assert!(
+        stderr.contains("ZHTW_NO_NETWORK"),
+        "refusal must name the variable, got: {stderr}"
+    );
+    assert!(
+        stderr.contains("--verify"),
+        "refusal must name the flag, got: {stderr}"
+    );
+    assert!(!blocked.status.success(), "refusing must not exit zero");
+
+    // Set: ordinary linting is untouched. The switch governs egress, not the
+    // scanner, and a linter that stopped working offline would be useless.
+    let ordinary = run(Some("1"), &[]);
+    assert!(ordinary.status.success(), "plain lint must still run");
+    let reported = String::from_utf8_lossy(&ordinary.stderr);
+    assert!(
+        reported.contains("軟體"),
+        "plain lint must still report findings, got: {reported}"
+    );
+
+    // The off-values ("0", empty, unset) are checked in
+    // engine::translate::no_network_off_values instead. Exercising them here
+    // would mean running --verify without a refusal, and that posts the fixture
+    // to Google from the test suite for the feature whose whole point is not
+    // doing that.
+}
+
+// Refusing has to happen before anything is written. The check used to sit in
+// the per-file path, after the fixer had already rewritten the file back to
+// disk, so "--fix --verify" under the switch destroyed the input and then
+// refused, once per file, with no report for any of them.
+#[cfg(feature = "translate")]
+#[test]
+fn cli_no_network_refuses_before_fix_writes_anything() {
+    let dir = tempfile::tempdir().expect("temp dir");
+    let first = dir.path().join("a.md");
+    let second = dir.path().join("b.md");
+    let original = "這個軟件需要優化。\n";
+    std::fs::write(&first, original).expect("write a.md");
+    std::fs::write(&second, original).expect("write b.md");
+
+    let out = Command::new(binary_path())
+        .args([
+            "lint",
+            "--fix",
+            "--verify",
+            first.to_str().expect("utf-8 path"),
+            second.to_str().expect("utf-8 path"),
+        ])
+        .env_remove("RUST_LOG")
+        .env("ZHTW_NO_NETWORK", "1")
+        .output()
+        .expect("run zhtw-mcp");
+
+    assert!(!out.status.success(), "refusing must not exit zero");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("ZHTW_NO_NETWORK"),
+        "refusal must name the variable: {stderr}"
+    );
+    // Once for the invocation, not once per file.
+    assert_eq!(
+        stderr.matches("ZHTW_NO_NETWORK").count(),
+        1,
+        "the refusal is about the run, not each file: {stderr}"
+    );
+    for path in [&first, &second] {
+        assert_eq!(
+            std::fs::read_to_string(path).expect("read back"),
+            original,
+            "{path:?} was rewritten before the refusal"
+        );
+    }
+}
+
+// The five-then-ten attribution phrases used to live in a `const` inside the
+// scanner, so they had no override, no `disabled` flag and no provenance gate
+// while every other rule had all three. They are ruleset rules now, carrying a
+// `structural_guard` that keeps the citation check the schema cannot express.
+// What that buys is exactly this: retiring one phrase without touching the
+// rest.
+#[test]
+fn cli_a_guarded_attribution_rule_can_be_retired_by_override() {
+    let dir = tempfile::tempdir().expect("temp dir");
+    let overrides = dir.path().join("overrides.json");
+    std::fs::write(
+        &overrides,
+        r#"{"schema_version":3,"spelling":[{"from":"觀察者指出","to":[],"type":"ai_filler",
+            "disabled":true,"context":"retired","structural_guard":"uncited_attribution"}],
+            "case":[]}"#,
+    )
+    .expect("write overrides");
+
+    let run = |args: &[&str], input: &str| -> String {
+        let mut child = Command::new(binary_path())
+            .args(args)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .env_remove("RUST_LOG")
+            .spawn()
+            .expect("spawn zhtw-mcp");
+        child
+            .stdin
+            .take()
+            .expect("stdin")
+            .write_all(input.as_bytes())
+            .expect("write stdin");
+        let out = child.wait_with_output().expect("collect output");
+        String::from_utf8_lossy(&out.stderr).into_owned()
+    };
+    let ov = overrides.to_str().expect("utf-8 path");
+
+    // Baseline: it fires, so the override below is proving something.
+    assert!(
+        run(
+            &["lint", "--detect-ai", "--"],
+            "觀察者指出這個現象值得注意。"
+        )
+        .contains("觀察者指出"),
+        "the phrase must fire without an override, or this test proves nothing"
+    );
+    assert!(
+        !run(
+            &["--overrides", ov, "lint", "--detect-ai", "--"],
+            "觀察者指出這個現象值得注意。"
+        )
+        .contains("觀察者指出"),
+        "a disabled override must retire the phrase"
+    );
+    // Retiring one must not empty the detector.
+    assert!(
+        run(
+            &["--overrides", ov, "lint", "--detect-ai", "--"],
+            "研究顯示成果很好。"
+        )
+        .contains("研究顯示"),
+        "sibling phrases must survive retiring one"
+    );
+
+    // And the guard still runs for the survivors: a cited claim is ordinary
+    // zh-TW, which is the check that kept these out of the ruleset before.
+    assert!(
+        !run(
+            &["--overrides", ov, "lint", "--detect-ai", "--"],
+            "專家認為這項安排可行[1]。"
+        )
+        .contains("專家認為"),
+        "the citation guard must still suppress a cited attribution"
     );
 }

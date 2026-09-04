@@ -2461,8 +2461,8 @@ fn e2e_detect_style_forces_full_three_axis_scorecard() {
         "detect_style should force the translationese axis even when detect_translationese=false: {content_text}"
     );
     assert!(
-        scores.get("consistency").is_some(),
-        "detect_style should always include the consistency axis: {content_text}"
+        scores.get("regional_density").is_some(),
+        "detect_style should always include the regional_density axis: {content_text}"
     );
 
     drop(stdin);
@@ -3366,4 +3366,83 @@ fn e2e_notifications_cancelled_with_id_rejected() {
     drop(stdin);
     let status = child.wait().unwrap();
     assert!(status.success(), "child exited with {status}");
+}
+
+// "verify" is the one tool argument that causes egress: it ships sentence-sized
+// excerpts of the caller's text to Google Translate. Under MCP the decision to
+// pass it belongs to a model, not to the person whose document it is, so the
+// operator's switch has to outrank the argument and say so in the error. Gated
+// like convert_accepts_verify_flag in tests/cli-convert.rs: without the feature
+// the tool has no "verify" argument to refuse, so the assertion below would
+// fail a legitimate build rather than catch a bug.
+#[cfg(feature = "translate")]
+#[test]
+fn e2e_no_network_env_refuses_the_verify_argument() {
+    let bin = binary_path();
+    let tmp = tempfile::tempdir().expect("create temp dir for the server session");
+    let mut child = Command::new(&bin)
+        .env("HOME", tmp.path())
+        .env("XDG_CONFIG_HOME", tmp.path().join(".config"))
+        .env("XDG_CACHE_HOME", tmp.path().join(".cache"))
+        .env("ZHTW_NO_NETWORK", "1")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .expect("spawn zhtw-mcp");
+    let mut stdin = child.stdin.take().unwrap();
+    let mut stdout = BufReader::new(child.stdout.take().unwrap());
+    handshake(&mut stdin, &mut stdout);
+
+    let text = "這個軟件需要優化。";
+    let (_, refused) = send_recv_skip_notifications(
+        &mut stdin,
+        &mut stdout,
+        &json!({
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/call",
+            "params": { "name": "zhtw", "arguments": { "text": text, "verify": true } }
+        }),
+    );
+    let message = refused["error"]["message"].as_str().unwrap_or_default();
+    assert!(
+        message.contains("ZHTW_NO_NETWORK"),
+        "refusal must name the variable so an operator can find it: {refused}"
+    );
+    assert_eq!(
+        refused["error"]["data"]["reason"], "network_disabled",
+        "refusal needs a machine-readable reason, not only prose: {refused}"
+    );
+
+    // The switch governs egress, not linting. Refusing the whole tool would
+    // make the server useless offline, which is where it is most wanted.
+    let (_, ordinary) = send_recv_skip_notifications(
+        &mut stdin,
+        &mut stdout,
+        &json!({
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "tools/call",
+            "params": { "name": "zhtw", "arguments": { "text": text } }
+        }),
+    );
+    assert!(
+        ordinary["result"].is_object(),
+        "a call without verify must still succeed: {ordinary}"
+    );
+    assert!(
+        ordinary["result"]["content"][0]["text"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("軟體"),
+        "and must still report findings: {ordinary}"
+    );
+
+    // Close stdin so the server exits on its own, then reap it: a killed but
+    // unwaited child stays a zombie for the rest of the run.
+    drop(stdin);
+    let _ = child.kill();
+    let _ = child.wait();
+    drop(tmp);
 }
