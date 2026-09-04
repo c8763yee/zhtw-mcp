@@ -89,13 +89,22 @@ report()
 
 # shellcheck disable=SC2086
 hits=$(grep -nE "$comment_lines" $files /dev/null \
-    | awk '{
-        rest = $0
-        gsub(/——+/, "", rest)
-        gsub(/'"'"'—'"'"'/, "", rest)
-        gsub(/"—"/, "", rest)
-        if (rest ~ /—/) print
-    }')
+    | awk '
+        BEGIN { dash = sprintf("%c", 1) }
+        {
+            rest = $0
+            gsub(/'"'"'—'"'"'/, "", rest)
+            gsub(/"—"/, "", rest)
+
+            # Every em dash becomes one sentinel byte before any run is
+            # measured. A regex quantifier binds to the last byte of a
+            # multibyte character in a byte-oriented awk, which is what a
+            # runner with no locale set provides, so /——+/ there eats an even
+            # number of dashes and leaves the third one of a run behind.
+            gsub(/—/, dash, rest)
+            gsub(dash dash "+", "", rest)
+            if (index(rest, dash)) print
+        }')
 [ -z "$hits" ] || report \
     "check-comments: the comments above use an em dash; a comma or a colon says it" \
     "$hits"

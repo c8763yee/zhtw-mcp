@@ -313,6 +313,15 @@ expect 1 "a staged comment quoting with backticks" sh ./scripts/git-pre-commit.s
 printf '#!/bin/sh\n\n# a comment naming prose.sh plainly\necho hi\n' > prose.sh
 git add prose.sh
 expect 0 "the same comment written the house way" sh ./scripts/git-pre-commit.sh
+
+# Forced into the byte locale a runner with no LANG set provides. A quantifier
+# binds to the last byte of a multibyte character there, so a run of three
+# 破折號 used to leave one dash behind and fail a comment that spends none.
+printf '#!/bin/sh\n\n# the 破折號 \342\200\224\342\200\224\342\200\224 in a run of three\necho hi\n' \
+    > prose.sh
+git add prose.sh
+expect 0 "a run of three dashes is data in the byte locale" \
+    env LC_ALL=C sh ./scripts/git-pre-commit.sh
 git rm -q --cached prose.sh
 rm -f prose.sh
 
