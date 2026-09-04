@@ -54,11 +54,51 @@ jobs:
       with:
         python-version: "3.x"
 
-    # `make check` gained a `black --check`, and the runner image does not
-    # carry black.  Only this job needs it; the build jobs run the table
-    # generator, which black never sees.
+    # `make check` runs black through scripts/indent.sh, and the runner image
+    # does not carry black.  Only this job needs it; the build jobs run the
+    # table generator, which black never sees.
     - name: Install black
       run: pip install black
+
+    # The shell lanes of `make check`.  shfmt takes its style from
+    # .editorconfig, so installing it here is the whole configuration.  Linux
+    # only, and that is deliberate: formatting does not vary by platform, and
+    # checking it on one runner is what the other two would repeat.  Both lanes
+    # report a skip where the tool is absent, which is what the macOS and
+    # Windows legs then do.
+    - name: Install the shell checkers
+      if: matrix.os == 'ubuntu-24.04'
+      run: sudo apt-get update && sudo apt-get install -y shellcheck shfmt
+
+    # commentflow settles comment width, which no other formatter here does:
+    # rustfmt leaves a short-wrapped comment short and shfmt does not touch
+    # comment text at all.  scripts/indent.sh skips its reflow lane when the
+    # binary is missing, and ZHTW_REQUIRE_TOOLS below turns that skip into a
+    # failure, so this step is what the formatting gate stands on.
+    #
+    # Built from a pinned revision rather than downloaded from the release
+    # tagged `latest`.  That tag is rolling, so the asset behind it moves, and a
+    # digest read from the same release metadata proves the transfer arrived
+    # intact without saying anything about which build arrived.  A commit is
+    # immutable and readable; bumping it is an edit to this line, which is
+    # exactly the review a formatter that rewrites every comment in the tree
+    # deserves.  It also drops the `sudo` and the write into /usr/local/bin that
+    # the tarball needed: cargo installs into ~/.cargo/bin, which is on PATH.
+    #
+    # The cost is about a minute of compile on a cold cache, and rust-cache
+    # above carries ~/.cargo across runs, so most runs pay nothing.
+    - name: Install commentflow
+      if: matrix.os == 'ubuntu-24.04'
+      env:
+        COMMENTFLOW_REV: 329ad4178e65e700528ef111cb11a075addb4eba
+      run: |
+        set -euo pipefail
+
+        # cargo records the source revision it installed from, so a warm
+        # ~/.cargo from the cache above makes this a no-op rather than a rebuild.
+        cargo install --git https://github.com/sysprog21/commentflow \
+          --rev "$COMMENTFLOW_REV" --locked commentflow
+        commentflow --help > /dev/null
 
     - name: make check
       if: matrix.os != 'windows-2025'
@@ -67,11 +107,19 @@ jobs:
         # workflow_dispatch has neither a PR base nor a push's before SHA, and
         # leaves this empty; the Makefile maps an empty value to HEAD.
         RULESET_BASELINE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        ZHTW_REQUIRE_TOOLS: ${{ matrix.os == 'ubuntu-24.04' && '1' || '' }}
       run: make check
 
     # `make` is not dependable on the Windows runner (see build-latest's
     # "Build and package" step below), so run the same checks `make check`
-    # would directly instead. This is what caught #124 and #126 turning
+    # would directly instead.  Two of them are missing here on purpose:
+    # scripts/indent.sh and the hook suite drive tar, mktemp, git worktrees and
+    # four hook wrappers through whatever sh the runner happens to provide, and
+    # neither a formatting rule nor a commit rule varies by platform.  The Linux
+    # leg is where both run; the direct `cargo fmt --check` and `black --check`
+    # below are what this leg keeps of the formatter chain.
+    #
+    # The rest of the list is what caught #124 and #126 turning
     # into recurring Windows-only regressions: those bugs only ever
     # surfaced on a contributor's own Windows machine because nothing in CI
     # ran the test suite there.
@@ -89,6 +137,52 @@ jobs:
         cargo fmt --check
         black --check .
         python scripts/check-ruleset.py --lint
+
+  # The commit-msg hook binds whoever installed it.  This binds everyone else: a
+  # rebase, an amend, `--no-verify`, or a subject typed into the GitHub merge box
+  # all reach the branch unread otherwise.  It runs the same script the pre-push
+  # hook runs, so a contributor with hooks and a contributor without are judged
+  # by one list.
+  #
+  # Pull requests only, and deliberately.  `base.sha..HEAD` is the work being
+  # proposed, which is the thing these rules are about.  The push event's range
+  # is not: a merge to main replays every commit of the merged branch, so a rule
+  # this log only started following recently would reject history rather than the
+  # change in front of it.
+  #
+  # Its own job rather than a step in `check`: it needs the full history, and the
+  # check matrix would otherwise pay for a deep clone on three runners to run one
+  # second of shell on one of them.
+  commit-log:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        fetch-depth: 0
+
+    - name: Check the commit messages
+      env:
+        BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      run: |
+        set -euo pipefail
+
+        # The width rules are measured by a python3 helper, and the hook treats
+        # a missing python3 as a lane to skip.  That is right on a laptop and
+        # wrong here: this job is the only thing binding a contributor without
+        # hooks, so a runner image without python3 has to fail rather than
+        # quietly stop counting columns.
+        python3 --version
+
+        # An unfetched base is not an empty range.  Say which one this is rather
+        # than reporting "nothing to check" for a check that could not run.
+        if ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+          echo "base commit $BASE_SHA is not in this checkout" >&2
+          exit 1
+        fi
+        git rev-list --no-merges "$BASE_SHA..HEAD" | ./scripts/check-commit-log.sh
 
   # Reads Cargo.lock against the RustSec advisory DB. Deliberately has no
   # Swatinem/rust-cache step: this job never compiles the workspace, and sharing
