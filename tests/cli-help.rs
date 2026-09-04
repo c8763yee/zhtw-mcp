@@ -1,11 +1,11 @@
-// Tests for `--help` and `-h`.
+// Tests for --help and -h.
 //
-// The help texts are the `<!-- cli:<name> -->` blocks in docs/cli.md,
-// embedded at build time by build.rs.  Tested here in three layers: the
-// block parser itself (included below, so these tests run the same code the
-// build ran), the binary's output against the docs blocks, and the contracts
-// the parser cannot see — the setup host list matching `setup::ALL_HOSTS`,
-// and help going to stdout with exit code 0.
+// The help texts are the cli:<name> blocks in docs/cli.md, embedded at
+// build time by build.rs.  Tested here in three layers: the block parser
+// itself (included below, so these tests run the same code the build ran),
+// the binary's output against the docs blocks, and the contracts the parser
+// cannot see: the setup host list matching setup::ALL_HOSTS, and help going
+// to stdout with exit code 0.
 
 use std::process::{Command, Output, Stdio};
 
@@ -14,13 +14,7 @@ mod help_blocks;
 use help_blocks::extract_cli_blocks;
 
 fn binary_path() -> std::path::PathBuf {
-    let mut path = std::env::current_exe().unwrap();
-    path.pop();
-    if path.ends_with("deps") {
-        path.pop();
-    }
-    path.push("zhtw-mcp");
-    path
+    std::path::PathBuf::from(env!("CARGO_BIN_EXE_zhtw-mcp"))
 }
 
 fn run(args: &[&str]) -> Output {
@@ -175,7 +169,7 @@ fn each_subcommand_prints_its_own_message() {
 
 #[test]
 fn lint_help_needs_no_file_argument_and_wins_over_files() {
-    // Without help, bare `lint` fails for lacking files; with it, help wins
+    // Without help, bare lint fails for lacking files; with it, help wins
     // regardless of position.
     let stdout = help_stdout(&["lint", "a.md", "-h"]);
     assert!(stdout.starts_with("zhtw-mcp lint - "));
@@ -184,7 +178,7 @@ fn lint_help_needs_no_file_argument_and_wins_over_files() {
 #[test]
 fn setup_help_lists_every_host_run_setup_accepts() {
     // The host list is static text in docs/cli.md now, so this is what keeps
-    // it in step with `setup::ALL_HOSTS`.
+    // it in step with setup::ALL_HOSTS.
     let stdout = help_stdout(&["setup", "--help"]);
     for host in zhtw_mcp::mcp::setup::ALL_HOSTS {
         assert!(
