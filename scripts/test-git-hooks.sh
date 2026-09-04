@@ -206,6 +206,13 @@ expect 1 "a merge subject carrying an override" \
 # character rules like every other message.
 expect 0 "a merge of two revisions by name" \
     message "Merge e023b4beffd14a005ac196471d6b2a4970d5ead4 into b732125feaee70b86243b63aeb6361b8979f870b"
+
+# The same words as a sentence rather than as two object names, carrying a
+# trailing period the rules forbid. Exempting the shape instead of the form
+# would hand every subject an opt-out for the price of the word "into", so what
+# this asserts is that the exemption does not reach it.
+expect 1 "a subject that merely reads like a merge" \
+    message "Merge the parser into the scanner."
 expect 1 "a lowercase subject" message "add the scratch repository"
 expect 1 "a past-tense subject" message "Added the scratch repository"
 expect 1 "a subject ending in a period" message "Add the scratch repository."

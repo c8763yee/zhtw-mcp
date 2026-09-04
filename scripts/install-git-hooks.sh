@@ -82,16 +82,20 @@ for hook in "$ROOT"/scripts/git-*.sh; do
         printf '  OK      %s\n' "$name"
     elif [ -e "$target" ] || [ -L "$target" ]; then
         printf '  KEEP    %s already exists; remove it to install ours\n' "$target"
-    elif wrapper "$name" > "$target.tmp" \
-        && chmod +x "$target.tmp" \
-        && mv -f "$target.tmp" "$target"; then
+    elif staging=$(mktemp "$hooks/.$name.XXXXXX") \
+        && wrapper "$name" > "$staging" \
+        && chmod +x "$staging" \
+        && mv -f "$staging" "$target"; then
         printf '  HOOK    %s\n' "$name"
     else
 
         # Through a temporary name and a rename, because a wrapper interrupted
         # halfway is a file the next run reads as somebody else's hook and
-        # refuses to touch, which is a broken hook nothing will repair.
-        rm -f "$target.tmp"
+        # refuses to touch, which is a broken hook nothing will repair. The name
+        # comes from mktemp rather than the hook's own: a predictable one in a
+        # directory this script does not own is a file it can truncate and a
+        # symlink it can follow.
+        [ -n "${staging:-}" ] && rm -f "$staging"
         printf '  ERROR   cannot write %s\n' "$target" >&2
         failed=1
     fi

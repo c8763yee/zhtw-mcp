@@ -171,7 +171,7 @@ if [ "$mode" = apply ]; then
 fi
 
 # The check writes too, just not here: the chain runs against a copy so that a
-# dirty tree is never rewritten by a gate. Four files come along that no lane
+# dirty tree is never rewritten by a gate. Five files come along that no lane
 # formats, because a formatter that cannot find its configuration in the copy
 # would judge the copy by different rules than the ones that wrote the tree:
 # Cargo.toml, which cargo fmt reads to find the crate; rust-toolchain.toml,

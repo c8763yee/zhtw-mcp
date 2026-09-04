@@ -32,12 +32,14 @@ if sed "/$scissors/,\$d" "$message_file" | grep -qE "^[^[:space:]$comment_char]"
     exit 0
 fi
 
-# Both temporary files go in the trap, and both names exist before it is set:
-# under set -u a handler naming an unset variable fails when it is needed most.
+# All three temporary names go in the trap, and every one exists before it is
+# set: under set -u a handler naming an unset variable fails when it is needed
+# most.
 rules=$(mktemp) || exit 0
 spliced=
-trap 'rm -f "$rules" "$spliced"' EXIT
-trap 'rm -f "$rules" "$spliced"; exit 130' HUP INT TERM
+staged_message=$message_file.tmp
+trap 'rm -f "$rules" "$spliced" "$staged_message"' EXIT
+trap 'rm -f "$rules" "$spliced" "$staged_message"; exit 130' HUP INT TERM
 
 # The list comes from the hook that enforces it, so the two cannot drift.
 {
@@ -64,9 +66,8 @@ spliced=$(mktemp) || exit 0
     awk -v cut="$cut" 'NR < cut' "$message_file"
     cat "$rules"
     awk -v cut="$cut" 'NR >= cut' "$message_file"
-} > "$spliced" && cat "$spliced" > "$message_file.tmp" \
-    && mv -f "$message_file.tmp" "$message_file"
-rm -f "$message_file.tmp"
+} > "$spliced" && cat "$spliced" > "$staged_message" \
+    && mv -f "$staged_message" "$message_file"
 
 # A helper that could not help must not stop the commit. Every path above that
 # gives up already exits 0, and without this the last line's status becomes the

@@ -64,16 +64,15 @@ cleanup=$(git config --get commit.cleanup 2> /dev/null) || cleanup=default
 
 # Each mode judged the way git stores it. Under verbatim nothing is removed, so
 # the scissors line and everything below it is part of the message. Under
-# whitespace git keeps comment lines and only trims blanks, so stripping them
-# here would judge text nobody commits. The rest drop comments, which is what
-# --strip-comments does.
+# whitespace git trims blanks and keeps both the comment lines and the scissors
+# section, so removing either here would judge text nobody commits. The rest
+# drop comments and cut at the scissors, which is what git does with them.
 case "$cleanup" in
     verbatim)
         message=$(cat "$message_file")
         ;;
     whitespace)
-        message=$(sed '/-\{8,\}[[:space:]]*>8[[:space:]]*-\{8,\}/,$d' "$message_file" \
-            | git stripspace)
+        message=$(git stripspace < "$message_file")
         ;;
     *)
         message=$(sed '/-\{8,\}[[:space:]]*>8[[:space:]]*-\{8,\}/,$d' "$message_file" \
@@ -167,9 +166,17 @@ fi
 case "$subject" in
     "fixup! "* | "squash! "* | "amend! "*) exit "$failed" ;;
     "Merge branch "* | "Merge branches "* | "Merge tag "* | "Merge commit "* | \
-        "Merge pull request "* | "Merge remote-tracking branch "* | \
-        "Merge "*" into "*) exit "$failed" ;;
+        "Merge pull request "* | "Merge remote-tracking branch "*) exit "$failed" ;;
 esac
+
+# The form git writes when it merges two revisions by name, which is what the
+# merge ref a pull request is tested on carries. Matched on the two object names
+# rather than on "Merge ... into ...", which is also a sentence somebody might
+# write about a parser and a scanner.
+if printf '%s' "$subject" \
+    | grep -qE '^Merge [0-9a-f]{7,40} into [0-9a-f]{7,40}$'; then
+    exit "$failed"
+fi
 
 if [ -z "$subject" ]; then
     error "a descriptive subject is required"

@@ -67,13 +67,19 @@ fi
 # prose. An attribute is code, and the string inside one carries backticks and
 # dashes for reasons this rule has nothing to say about, so the bracket forms
 # are excluded and a shebang, which is neither, is not.
-comment_lines='^[[:space:]]*(//|#($|[^![/]|![^[/]))'
+comment_lines='^[[:space:]]*(//|#($|[^![]|![^[/]))'
 
 # Any em dash, spaced or not: the sweep that emptied this tree put a space on
 # each side of every one it found, so an unspaced one is the shape that would
 # arrive next and the one a space-anchored pattern would miss. The doubled form
-# is the zh-TW 破折號 and is data here rather than punctuation, so it is left
-# alone, as is one inside quotes, which names the character rather than uses it.
+# is the zh-TW 破折號, in any run length, and a quoted one names the character
+# rather than uses it. A comment about a run of three is discussing the dash,
+# not spending one.
+#
+# Removed from a copy of the line rather than used to skip the line, because a
+# comment can carry both: excusing a whole line for the data on it is how a real
+# dash beside that data gets through.
+
 report()
 {
     printf '%s\n' "$2" | sed 's/^/  /' >&2
@@ -83,8 +89,13 @@ report()
 
 # shellcheck disable=SC2086
 hits=$(grep -nE "$comment_lines" $files /dev/null \
-    | grep -F '—' \
-    | grep -vF '——' | grep -vF "'—'" | grep -vF '"—"')
+    | awk '{
+        rest = $0
+        gsub(/——+/, "", rest)
+        gsub(/'"'"'—'"'"'/, "", rest)
+        gsub(/"—"/, "", rest)
+        if (rest ~ /—/) print
+    }')
 [ -z "$hits" ] || report \
     "check-comments: the comments above use an em dash; a comma or a colon says it" \
     "$hits"
