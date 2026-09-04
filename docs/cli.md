@@ -72,6 +72,7 @@ Options:
                             translation (sends text to the network,
                             requires the translate feature)
   --telemetry               Print stderr summary counters after the run
+  --document-genre <g>      casual|technical|financial; with --detect-ai
   -h, --help                Show this help
 
 ```
