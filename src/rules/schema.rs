@@ -59,6 +59,14 @@ pub enum RuleType {
     Translationese,
 }
 
+/// Structural guards the engine implements.
+///
+/// A rule naming one of these is owned by a procedural detector rather than by
+/// the lexical pass. `scripts/check-ruleset.py` validates `structural_guard`
+/// against this list, so a typo fails the ruleset lint instead of silently
+/// removing a rule from both paths.
+pub const KNOWN_STRUCTURAL_GUARDS: &[&str] = &["uncited_attribution"];
+
 /// A spelling/terminology rule.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SpellingRule {
@@ -81,6 +89,12 @@ pub struct SpellingRule {
     /// E.g. 並行 = concurrency (TW) vs parallelism (CN).
     #[serde(default)]
     pub english: Option<String>,
+    /// Evidence for adding this rule: either a fixture path under "tests/" or
+    /// the id of a corpus case that demonstrates the regression. Existing
+    /// embedded rules predate this field; the ruleset linter requires it only
+    /// for rules newly added relative to HEAD.
+    #[serde(default)]
+    pub source: Option<String>,
     /// Exception phrases where the matched form should not be flagged.
     /// Applies to all rule types (variant, cross_strait, typo, confusable).
     /// E.g. chess term 下著 keeps 着; 分類 keeps 類 from firing as a class
@@ -147,6 +161,27 @@ pub struct SpellingRule {
     /// `derive_explain_meta`).
     #[serde(default)]
     pub editorial_confidence: Option<EditorialConfidence>,
+    /// Names a procedural detector that owns this phrase, instead of letting
+    /// the lexical pass emit it.
+    ///
+    /// Some tells need a guard the schema cannot express. An uncited
+    /// attribution is the case this exists for: 研究顯示 is ordinary zh-TW
+    /// whenever a citation follows it in the same sentence, and deciding that
+    /// means looking for numbered brackets, footnote markers, Markdown links
+    /// and bare URLs, honoring the exclusion ranges, and stopping at the
+    /// sentence boundary. `negative_context_clues` holds substrings and can
+    /// express none of it.
+    ///
+    /// Before this field the phrases lived in a `const` inside the scanner,
+    /// which meant no user override, no `disabled` flag and no provenance
+    /// gate, while every other rule had all three. Carrying them here as
+    /// ordinary rules restores that, and the guard name tells the lexical pass
+    /// to skip them so the detector remains the only thing that can emit one.
+    ///
+    /// The value must name a guard the engine implements; the ruleset linter
+    /// rejects unknown names rather than silently disabling a rule.
+    #[serde(default)]
+    pub structural_guard: Option<String>,
 }
 
 /// A replacement set selected by surrounding context.

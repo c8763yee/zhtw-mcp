@@ -130,6 +130,7 @@ mod tests {
                 disabled,
                 context,
                 english,
+                source,
                 exceptions,
                 context_clues,
                 negative_context_clues,
@@ -137,6 +138,7 @@ mod tests {
                 context_suggestions,
                 tags,
                 editorial_confidence,
+                structural_guard,
             } = j;
             assert_eq!(*from, p.from, "spelling rule {i}: from mismatch");
             assert_eq!(*to, p.to, "spelling rule {i}: to mismatch");
@@ -150,6 +152,11 @@ mod tests {
             );
             assert_eq!(*context, p.context, "spelling rule {i}: context mismatch");
             assert_eq!(*english, p.english, "spelling rule {i}: english mismatch");
+            assert_eq!(*source, p.source, "spelling rule {i}: source mismatch");
+            assert_eq!(
+                *structural_guard, p.structural_guard,
+                "spelling rule {i}: structural_guard mismatch"
+            );
             assert_eq!(
                 *exceptions, p.exceptions,
                 "spelling rule {i}: exceptions mismatch"

@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 // existing crate::rules::ruleset::* path keeps resolving.
 pub use super::schema::{
     CaseRule, ContextSuggestion, EditorialConfidence, RuleType, Ruleset, SpellingRule,
+    KNOWN_STRUCTURAL_GUARDS,
 };
 
 /// Linting profile controlling zh-TW norm enforcement strictness.
@@ -29,6 +30,30 @@ pub enum Profile {
     Strict,
 }
 
+/// Intended register of the document being reviewed.
+///
+/// Unlike the translationese domain, this selects the action suggested for an
+/// unsupported authority attribution. Casual prose can drop it; technical and
+/// financial prose must preserve the claim and name its source.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DocumentGenre {
+    Casual,
+    Technical,
+    Financial,
+}
+
+impl DocumentGenre {
+    pub fn from_str_strict(s: &str) -> Option<Self> {
+        match s {
+            "casual" => Some(Self::Casual),
+            "technical" => Some(Self::Technical),
+            "financial" => Some(Self::Financial),
+            _ => None,
+        }
+    }
+}
+
 /// Processing chain configuration for a profile.
 ///
 /// Each profile is a combination of enabled rule stages rather than a
@@ -36,6 +61,8 @@ pub enum Profile {
 /// they do not replace earlier ones.
 #[derive(Debug, Clone, Copy)]
 pub struct ProfileConfig {
+    /// Register governing advice for unsupported authority attributions.
+    pub document_genre: DocumentGenre,
     /// Enable spelling rules (cross-strait, political, typo, confusable).
     pub spelling: bool,
     /// Enable case rules (proper noun casing).
@@ -148,6 +175,7 @@ impl Profile {
     pub fn config(self) -> ProfileConfig {
         match self {
             Profile::Base => ProfileConfig {
+                document_genre: DocumentGenre::Casual,
                 spelling: true,
                 casing: true,
                 basic_punctuation: true,
@@ -172,6 +200,7 @@ impl Profile {
                 exempt_blockquotes: false,
             },
             Profile::Strict => ProfileConfig {
+                document_genre: DocumentGenre::Casual,
                 spelling: true,
                 casing: true,
                 basic_punctuation: true,
@@ -431,6 +460,7 @@ impl SpellingRule {
             disabled: false,
             context: None,
             english: None,
+            source: None,
             exceptions: None,
             context_clues: None,
             negative_context_clues: None,
@@ -438,8 +468,99 @@ impl SpellingRule {
             context_suggestions: None,
             tags: None,
             editorial_confidence: None,
+            structural_guard: None,
         }
     }
+}
+
+/// Which structural detector produced a finding.
+///
+/// The document score weighs how many distinct detectors fired, not how many
+/// times, so it needs the detector's identity. Reading that back out of the
+/// display context does not work: several messages open with a runtime count,
+/// so dash overuse and paragraph endings both reduced to the paragraph total
+/// and merged or split by document length. It is also the pattern this crate
+/// removed for the translationese phases, for the same reason.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum StructuralFamily {
+    BinaryContrast,
+    ParagraphEndings,
+    DashOveruse,
+    FormulaicHeadings,
+    ListDensity,
+    Tricolon,
+    NegativeParallel,
+    FormulaicClosing,
+    SignificanceStamp,
+    EraOpener,
+    FourCharBulletLabels,
+    MechanicalBullets,
+    BoldInSentence,
+    BoldInParagraph,
+    AbstractLineMetaphor,
+    RepeatedSlogan,
+    RhetoricalSelfQa,
+    EmDashOveruse,
+    FormulaicDespite,
+    FalseRanges,
+    MixedReaderAddress,
+    StackedPoliteness,
+}
+
+impl StructuralFamily {
+    /// Whether the finding is evidence about who wrote the document.
+    ///
+    /// Most of these families are. Two are not: a Taiwanese procedure that
+    /// opens every step with 請 is the standard house form, and mixing 你 with
+    /// 您 is an editing slip a human makes as readily as a model. They are
+    /// reported because they are defects, and they carry a family so the
+    /// per-occurrence density signal skips them, but they add nothing to the
+    /// authorship score.
+    pub fn is_authorship_evidence(self) -> bool {
+        !matches!(self, Self::MixedReaderAddress | Self::StackedPoliteness)
+    }
+
+    /// Whether the detector measures layout rather than writing.
+    ///
+    /// Bold runs, list shape and heading form describe the Markdown house
+    /// style. They are capped apart from the prose families so that a heavily
+    /// formatted document does not outvote what it actually says.
+    pub fn is_formatting(self) -> bool {
+        matches!(
+            self,
+            Self::FormulaicHeadings
+                | Self::ListDensity
+                | Self::FourCharBulletLabels
+                | Self::MechanicalBullets
+                | Self::BoldInSentence
+                | Self::BoldInParagraph
+        )
+    }
+}
+
+/// A translationese detector family. Several exist in two passes that can
+/// report the same span, and the overlap pass keeps one of them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PhaseFamily {
+    /// 之一 superlative calque.
+    YiZhi,
+    /// Redundant paired connective.
+    Connective,
+    /// Nominalization chain.
+    Nominalization,
+    /// False-friend adverbial.
+    FalseFriend,
+    /// Stacked pre-modifier.
+    LongPremodifier,
+}
+
+/// Which pass of a paired detector produced a finding. The indexed pass knows
+/// sentence and paragraph boundaries; the lexical one only matches substrings,
+/// so it yields when both cover the same span.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PhasePass {
+    Lexical,
+    Indexed,
 }
 
 /// An issue found by the scanner.
@@ -458,8 +579,11 @@ pub struct Issue {
     /// Suggested replacements.  Arc avoids per-issue allocation during
     /// inflate — most issues share suggestions with their source rule.
     pub suggestions: Arc<[String]>,
-    /// Manual rewrite hint for translationese issues.  Derived from the
-    /// first non-empty suggestion when a translationese rule supplies one.
+    /// Manual rewrite hint for a style rewrite. AI-style hints are present
+    /// only for one determined non-empty replacement; competing alternatives
+    /// need an AI (or human) to rewrite the surrounding clause. Translationese
+    /// retains its ranked first candidate because disambiguation can promote a
+    /// context-selected candidate to that position.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub suggested_rewrite: Option<String>,
     /// Classification of the triggering rule.
@@ -496,6 +620,19 @@ pub struct Issue {
     /// left in the gray zone for Tier 3.  Internal — not serialized.
     #[serde(skip)]
     pub tier2_outcome: Tier2Outcome,
+    /// Which translationese detector produced this, and which pass it ran in.
+    ///
+    /// The overlap pass needs to know that the lexical and the
+    /// boundary-aware halves of a pair are the same finding. It used to learn
+    /// that by searching the display context for a scheme code such as
+    /// "ZY1b", which made a human-readable string load-bearing: rewording the
+    /// message silently changed which issues were deduplicated. Internal, not
+    /// serialized.
+    #[serde(skip)]
+    pub phase_family: Option<(PhaseFamily, PhasePass)>,
+    /// Which structural AI detector produced this. Internal, not serialized.
+    #[serde(skip)]
+    pub structural_family: Option<StructuralFamily>,
     /// Whether Tier 3 LLM sampling produced a judgment for this issue.
     /// Set by `refine_issues_with_sampling` (or judgment cache hit).
     /// Used by `ResolutionTier::classify` to distinguish LLM-judged from
@@ -529,16 +666,29 @@ pub struct TableCell {
 }
 
 impl Issue {
-    /// Derive the manual rewrite hint: the first non-empty suggestion, but
-    /// only for translationese rules (other rule types have no rewrite hint).
+    /// Derive a manual rewrite hint without silently choosing among
+    /// alternatives. AI-style findings are often handed to an assistant for a
+    /// clause-level rewrite, where a single replacement is useful anchor text
+    /// but the first item in an alternatives list is not. Translationese
+    /// keeps its ranked first candidate: local or LLM disambiguation promotes
+    /// the selected contextual form to index zero before this is refreshed.
+    ///
+    /// This is presentation metadata for the explain output. It does not
+    /// govern whether the fixer applies anything: that is decided separately
+    /// by the tier logic in "fixer::fix_verdict", which today applies any
+    /// issue carrying exactly one suggestion. A detector that must never be
+    /// applied mechanically has to emit no suggestion at all.
     pub fn derive_suggested_rewrite(
         rule_type: IssueType,
         suggestions: &[String],
     ) -> Option<String> {
-        if rule_type == IssueType::Translationese {
-            suggestions.iter().find(|s| !s.is_empty()).cloned()
-        } else {
-            None
+        match rule_type {
+            IssueType::Translationese => suggestions.iter().find(|s| !s.is_empty()).cloned(),
+            IssueType::AiStyle => match suggestions {
+                [suggestion] if !suggestion.is_empty() => Some(suggestion.clone()),
+                _ => None,
+            },
+            _ => None,
         }
     }
 
@@ -567,6 +717,8 @@ impl Issue {
             suggested_rewrite,
             rule_type,
             severity,
+            phase_family: None,
+            structural_family: None,
             context: None,
             english: None,
             context_clues: None,
@@ -605,6 +757,8 @@ impl Issue {
             suggested_rewrite: None,
             rule_type,
             severity,
+            phase_family: None,
+            structural_family: None,
             context: None,
             english: None,
             context_clues: None,
@@ -619,6 +773,19 @@ impl Issue {
     }
 
     /// Builder: attach context string.
+    /// Tag the finding with the paired detector it came from, so the overlap
+    /// pass can recognise the two halves without reading the message.
+    pub(crate) fn with_phase_family(mut self, family: PhaseFamily, pass: PhasePass) -> Self {
+        self.phase_family = Some((family, pass));
+        self
+    }
+
+    /// Record which structural detector produced this finding.
+    pub(crate) fn with_structural_family(mut self, family: StructuralFamily) -> Self {
+        self.structural_family = Some(family);
+        self
+    }
+
     pub fn with_context(mut self, ctx: impl Into<String>) -> Self {
         self.context = Some(Arc::from(ctx.into()));
         self
@@ -802,6 +969,29 @@ mod delete_suggestion_tests {
 }
 
 #[cfg(test)]
+mod suggested_rewrite_tests {
+    use super::*;
+
+    #[test]
+    fn style_rewrite_hint_requires_one_determined_replacement() {
+        assert_eq!(
+            Issue::derive_suggested_rewrite(IssueType::AiStyle, &["廣泛使用".into()]),
+            Some("廣泛使用".into())
+        );
+        assert_eq!(
+            Issue::derive_suggested_rewrite(IssueType::AiStyle, &["藉由".into(), "經由".into()]),
+            None,
+            "a rewrite assistant must not be handed an arbitrary first alternative"
+        );
+        assert_eq!(
+            Issue::derive_suggested_rewrite(IssueType::AiStyle, &["".into()]),
+            None,
+            "a deletion is an instruction, not replacement anchor text"
+        );
+    }
+}
+
+#[cfg(test)]
 mod schema_facts_tests {
     use super::*;
 
@@ -851,6 +1041,7 @@ mod schema_facts_tests {
         let sample = SpellingRule {
             context: Some(String::new()),
             english: Some(String::new()),
+            source: Some(String::new()),
             exceptions: Some(Vec::new()),
             context_clues: Some(Vec::new()),
             negative_context_clues: Some(Vec::new()),
@@ -858,6 +1049,7 @@ mod schema_facts_tests {
             context_suggestions: Some(Vec::new()),
             tags: Some(Vec::new()),
             editorial_confidence: Some(EditorialConfidence::Low),
+            structural_guard: Some(String::new()),
             ..SpellingRule::new("x", vec!["y".into()], RuleType::CrossStrait)
         };
         let case = CaseRule {
@@ -916,6 +1108,7 @@ mod schema_facts_tests {
                 "UPDATE_SCHEMA_FACTS=1 cargo test schema_facts_file_is_current."
             ),
             "spelling_fields": keys(&sample),
+            "structural_guards": KNOWN_STRUCTURAL_GUARDS,
             "case_fields": keys(&case),
             "rule_types": all.iter().map(|rt| name(*rt)).collect::<Vec<_>>(),
             "orthographic_rule_types": all

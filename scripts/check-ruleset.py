@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import subprocess
 import sys
 import time
 import urllib.parse
@@ -34,7 +35,7 @@ def dedup_sort(
     Returns (deduplicated_rules, space_dup_warnings).
     """
     seen: set[str] = set()
-    seen_nospace: dict[str, str] = {}  # nospace -> first key
+    seen_nospace: dict[str, dict[str, Any]] = {}  # nospace -> first rule
     out: list[dict[str, Any]] = []
     space_warnings: list[str] = []
     for rule in rules:
@@ -42,14 +43,19 @@ def dedup_sort(
         if k in seen:
             continue
         ns = k.replace(" ", "").replace("\u3000", "")
-        if ns in seen_nospace:
+        prior = seen_nospace.get(ns)
+        # AI filler rules may intentionally carry whitespace variants. They
+        # share behavior and provenance but the scanner matches source text.
+        if prior is not None and not (
+            rule.get("type") == "ai_filler" and prior.get("type") == "ai_filler"
+        ):
             space_warnings.append(
                 f'space-dup: "{k}" collapsed as duplicate of '
-                f'"{seen_nospace[ns]}" (differ only by whitespace)'
+                f'"{prior[key]}" (differ only by whitespace)'
             )
             continue
         seen.add(k)
-        seen_nospace[ns] = k
+        seen_nospace[ns] = rule
         out.append(rule)
     return sorted(out, key=lambda r: r[key]), space_warnings
 
@@ -69,7 +75,7 @@ def _load_schema_facts() -> dict[str, list[str]]:
     not silently downgrade it to checks that cannot see a renamed field.
     """
     try:
-        return json.loads(SCHEMA_FACTS.read_text())
+        return json.loads(SCHEMA_FACTS.read_text(encoding="utf-8"))
     except (OSError, ValueError) as e:
         sys.exit(
             f"error: cannot read {SCHEMA_FACTS.name}: {e}\n"
@@ -81,6 +87,9 @@ _FACTS = _load_schema_facts()
 
 VALID_RULE_TYPES = set(_FACTS["rule_types"])
 VALID_EDITORIAL_CONFIDENCE = set(_FACTS["editorial_confidence"])
+# Guard names the engine implements. Generated from KNOWN_STRUCTURAL_GUARDS, so
+# a rule naming a guard this build lacks fails the lint instead of going inert.
+VALID_STRUCTURAL_GUARDS = set(_FACTS["structural_guards"])
 
 # Rule types the fixer applies at every tier (IssueType::is_orthographic).
 # editorial_confidence is meaningless on these: the fixer's gate is guarded on
@@ -149,6 +158,7 @@ SPELLING_FIELD_ORDER = [
     "disabled",
     "context",
     "english",
+    "source",
     "context_clues",
     "negative_context_clues",
     "positional_clues",
@@ -156,6 +166,7 @@ SPELLING_FIELD_ORDER = [
     "context_suggestions",
     "tags",
     "editorial_confidence",
+    "structural_guard",
 ]
 
 CASE_FIELD_ORDER = ["term", "alternatives", "disabled"]
@@ -547,6 +558,7 @@ VALID_DOMAINS = {
     "線性代數",
     "地理資訊",
     "軍事",
+    "影音",
 }
 
 # Valid @geo sub-types.
@@ -1031,6 +1043,24 @@ def detect_conflicts(
                     f'schema: "{frm}" sets editorial_confidence on type '
                     f"\"{rule['type']}\", which the fixer treats as orthographic "
                     "and applies at every tier; the annotation has no effect"
+                )
+        # A structural_guard hands the phrase to a procedural detector and
+        # takes it out of the lexical automaton. An unknown name would remove
+        # it from both, so the rule would exist and do nothing.
+        sg = rule.get("structural_guard")
+        if sg is not None:
+            if not isinstance(sg, str) or sg not in VALID_STRUCTURAL_GUARDS:
+                warnings.append(
+                    f'structural-guard: "{frm}" names unknown guard "{sg}" '
+                    f"(valid: {', '.join(sorted(VALID_STRUCTURAL_GUARDS))})"
+                )
+            elif rule.get("to"):
+                # The detector decides what to say, and none of these offer a
+                # replacement: deleting an attribution off the front of a
+                # sentence leaves ungrammatical zh-TW.
+                warnings.append(
+                    f'structural-guard: "{frm}" is guarded but carries a "to"; '
+                    "guarded rules are advice-only"
                 )
         # Validate context_suggestions: a list of {clues, to} groups, both
         # non-empty lists of strings.  The compiler drops malformed groups
@@ -1727,6 +1757,135 @@ def default_path() -> Path:
     return Path(__file__).resolve().parent.parent / "assets" / "ruleset.json"
 
 
+def _in_git_repo(repo: Path) -> bool:
+    """Whether Git considers this directory part of a repository.
+
+    Testing for a ".git" entry answers a different question: a nested
+    checkout, a directory below the top level, or an external GIT_DIR all
+    leave it absent while Git works fine.  Treating those as "standalone"
+    made the provenance gate return no errors, so --lint passed while
+    checking nothing.
+    """
+    try:
+        return (
+            subprocess.run(
+                ["git", "rev-parse", "--git-dir"],
+                cwd=repo,
+                capture_output=True,
+                check=False,
+            ).returncode
+            == 0
+        )
+    except OSError:
+        # Git is not installed at all, which is the standalone case.
+        return False
+
+
+def new_rules_missing_provenance(
+    path: Path, spelling_rules: list[dict[str, Any]], baseline_ref: str
+) -> list[str]:
+    """Return newly-added rules that lack an evidence reference.
+
+    The repository's checked-in rules are a historical baseline, not an
+    invitation to backfill thousands of entries.  Compare by `from`, the same
+    identity the ruleset uses for deduplication, so edits to an established
+    rule do not suddenly require invented provenance.
+    """
+    repo = Path(__file__).resolve().parent.parent
+    # Compare against the same file being checked, not a hard-coded one, so
+    # running the checker on an alternate ruleset does not diff it against
+    # assets/ruleset.json and call every rule in it new.
+    try:
+        rel = path.resolve().relative_to(repo).as_posix()
+    except ValueError:
+        return []
+
+    try:
+        baseline = subprocess.run(
+            ["git", "show", f"{baseline_ref}:{rel}"],
+            cwd=repo,
+            text=True,
+            # The ruleset is UTF-8 Chinese. Without this, text mode decodes
+            # with the locale codec, which on Windows is cp1252 and raises
+            # UnicodeDecodeError on the first Han character.
+            encoding="utf-8",
+            capture_output=True,
+            check=True,
+        )
+        old = json.loads(baseline.stdout)
+        old_from = {
+            r["from"]
+            for r in old.get("spelling_rules", [])
+            if isinstance(r, dict) and isinstance(r.get("from"), str)
+        }
+    except (
+        OSError,
+        UnicodeDecodeError,
+        subprocess.CalledProcessError,
+        json.JSONDecodeError,
+    ) as exc:
+        if not _in_git_repo(repo):
+            # A standalone copy of the checker has no repository baseline;
+            # schema validation still runs, but this repository-specific
+            # incremental gate cannot make a justified comparison.
+            return []
+        # Inside the repository a missing or unreadable baseline is a broken
+        # invocation, not an exemption. Returning [] here let --lint pass while
+        # checking nothing.
+        return [
+            f"provenance: cannot read baseline '{baseline_ref}:{rel}' ({exc}); "
+            "check --baseline-ref and that git is available"
+        ]
+
+    corpus_ids: set[str] = set()
+    corpus_dir = repo / "tests" / "corpus"
+    for corpus_path in corpus_dir.glob("*.json"):
+        try:
+            corpus = json.loads(corpus_path.read_text(encoding="utf-8"))
+            # Hand-edited corpora turn up with the wrong shape. Validate rather
+            # than assume: a list at the top level, or a non-list "cases", used
+            # to abort the whole lint run with a traceback.
+            if not isinstance(corpus, dict):
+                continue
+            cases = corpus.get("cases")
+            if not isinstance(cases, list):
+                continue
+            corpus_ids.update(
+                case["id"]
+                for case in cases
+                if isinstance(case, dict) and isinstance(case.get("id"), str)
+            )
+        except (OSError, json.JSONDecodeError):
+            continue
+
+    missing = []
+    for rule in spelling_rules:
+        frm = rule.get("from")
+        source = rule.get("source")
+        if not isinstance(frm, str) or frm in old_from:
+            continue
+        # Resolve before testing containment: "tests/../Cargo.toml" starts
+        # with "tests/" and is a real file, but is not a fixture.
+        # Evidence means a fixture, not any file that happens to live under
+        # tests/: pointing at a test source such as tests/cli-lint.rs would
+        # satisfy the gate while demonstrating nothing. The isinstance guard
+        # also keeps an unhashable hand-edited value out of the set lookup,
+        # which used to raise TypeError and abort the run.
+        if isinstance(source, str):
+            candidate = (repo / source).resolve()
+            if candidate.is_file() and candidate.is_relative_to(
+                repo / "tests" / "fixtures"
+            ):
+                continue
+            if source in corpus_ids:
+                continue
+        missing.append(
+            f'provenance: new rule "{frm}" needs source naming an existing '
+            "fixture path under tests/fixtures/ or a corpus case id"
+        )
+    return missing
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("path", nargs="?", type=Path, default=default_path())
@@ -1745,6 +1904,11 @@ def main() -> int:
         type=Path,
         default=Path(__file__).resolve().parent.parent / ".verify-cache.json",
         help="path to verification cache file (default: .verify-cache.json)",
+    )
+    parser.add_argument(
+        "--baseline-ref",
+        default="HEAD",
+        help="Git revision containing the pre-change ruleset (default: HEAD)",
     )
     args = parser.parse_args()
     path: Path = args.path
@@ -1782,6 +1946,9 @@ def main() -> int:
     conflicts, advisories = detect_conflicts(data["spelling_rules"])
     conflicts.extend(space_warnings)
     conflicts.extend(check_schema_parity())
+    conflicts.extend(
+        new_rules_missing_provenance(path, data["spelling_rules"], args.baseline_ref)
+    )
     if conflicts:
         print(f"conflicts ({len(conflicts)}):", file=sys.stderr)
         for w in conflicts:
