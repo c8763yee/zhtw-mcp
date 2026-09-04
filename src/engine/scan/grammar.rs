@@ -4155,7 +4155,7 @@ fn scan_trans_adverbial_particle_redundant(
 // These four detectors capture EN→ZH translation tells from a six-red- flag
 // review checklist, complementing (not duplicating) the existing
 // dewesternise-checklist coverage in scan_translationese_syntactic. All four
-// are substring-only: no boundary index required: so they run as soon as
+// are substring-only, needing no boundary index, so they run as soon as
 // translationese_detection is enabled.
 //
 //   ZY1a: 之一 superlative calque (Red Flag 4)

@@ -1,9 +1,14 @@
 #!/bin/sh
 
-# Judge the commit messages this push would publish. The commit-msg hook only
-# sees a message as it is written, so a rebase, an amend, or a commit made with
-# --no-verify reaches the remote unread. This is the last place to catch that
-# while the history is still local and cheap to rewrite.
+# Judge the commit messages this push would publish.
+#
+# Merges included. git-commit-msg.sh exempts a merge subject from the width and
+# mood rules because it is git's wording rather than the author's, but not from
+# the tab, override and em dash checks, and filtering merges out here meant they
+# reached the remote without those. The commit-msg hook only sees a message as
+# it is written, so a rebase, an amend, or a commit made with --no-verify
+# reaches the remote unread. This is the last place to catch that while the
+# history is still local and cheap to rewrite.
 
 set -u
 
@@ -44,15 +49,15 @@ while read -r local_ref local_sha remote_ref remote_sha; do
     if [ "$remote_sha" = "$zero" ] \
         || ! git cat-file -e "${remote_sha}^{commit}" 2> /dev/null; then
         if [ -n "$published" ]; then
-            commits=$(git rev-list --no-merges "$local_sha" --not "$published")
+            commits=$(git rev-list "$local_sha" --not "$published")
         else
 
             # Nothing is tracked for this remote, so nothing is known to be on
             # it. Everything reachable is what this push would publish there.
-            commits=$(git rev-list --no-merges "$local_sha")
+            commits=$(git rev-list "$local_sha")
         fi
     else
-        commits=$(git rev-list --no-merges "${remote_sha}..${local_sha}")
+        commits=$(git rev-list "${remote_sha}..${local_sha}")
     fi || {
         echo "Push rejected: cannot list commits for $local_ref" >&2
         failed=1

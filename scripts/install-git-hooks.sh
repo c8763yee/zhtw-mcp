@@ -33,6 +33,17 @@ ours()
     [ -f "$1" ] && wrapper "$2" | cmp -s - "$1"
 }
 
+# A global hooksPath is often shared by unrelated repositories, and installing a
+# wrapper there makes their hooks run scripts out of their own checkouts. Both
+# directions refuse it, for the same reason in each: a directory this repository
+# never wrote to is one it must not remove from either, since a wrapper sitting
+# there was put there by whoever shares it.
+if [ "$hooks" != "$default_hooks" ]; then
+    printf '  NOTE    core.hooksPath points hooks at %s; skipping %s\n' \
+        "$hooks" "$mode"
+    exit 0
+fi
+
 if [ "$mode" = uninstall ]; then
     for target in "$hooks"/*; do
 
@@ -40,17 +51,14 @@ if [ "$mode" = uninstall ]; then
         # thing to establish is that the name is a file at all.
         [ -e "$target" ] || continue
         ours "$target" "${target##*/}" || continue
-        rm -f "$target"
+        if ! rm -f "$target"; then
+            printf '  ERROR   cannot remove %s\n' "$target" >&2
+            failed=1
+            continue
+        fi
         printf '  RM      %s\n' "${target##*/}"
     done
-    exit 0
-fi
-
-# A global hooksPath is often shared by unrelated repositories. Installing a
-# wrapper there makes their hooks try to run scripts from their own checkouts.
-if [ "$hooks" != "$default_hooks" ]; then
-    printf '  NOTE    core.hooksPath points hooks at %s; skipping installation\n' "$hooks"
-    exit 0
+    exit "$failed"
 fi
 
 mkdir -p "$hooks" || exit 1
@@ -74,9 +82,16 @@ for hook in "$ROOT"/scripts/git-*.sh; do
         printf '  OK      %s\n' "$name"
     elif [ -e "$target" ] || [ -L "$target" ]; then
         printf '  KEEP    %s already exists; remove it to install ours\n' "$target"
-    elif wrapper "$name" > "$target" && chmod +x "$target"; then
+    elif wrapper "$name" > "$target.tmp" \
+        && chmod +x "$target.tmp" \
+        && mv -f "$target.tmp" "$target"; then
         printf '  HOOK    %s\n' "$name"
     else
+
+        # Through a temporary name and a rename, because a wrapper interrupted
+        # halfway is a file the next run reads as somebody else's hook and
+        # refuses to touch, which is a broken hook nothing will repair.
+        rm -f "$target.tmp"
         printf '  ERROR   cannot write %s\n' "$target" >&2
         failed=1
     fi

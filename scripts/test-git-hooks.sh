@@ -165,6 +165,21 @@ cases=$((cases + 1))
 if [ -e "$shared_hooks" ]; then
     fail "installer wrote to a shared hooks path"
 fi
+
+# The other direction of the same rule. A wrapper in a shared directory was put
+# there by whoever shares it, so removing it is not this repository's to do.
+mkdir -p "$shared_hooks"
+printf '#!/bin/sh\n' > "$shared_hooks/commit-msg"
+printf '%s\n' '#!/bin/sh' \
+    "exec \"\$(git rev-parse --show-toplevel)/scripts/git-pre-push.sh\" \"\$@\"" \
+    > "$shared_hooks/pre-push"
+expect 0 "uninstaller skips a shared hooks path" \
+    ./scripts/install-git-hooks.sh --uninstall
+cases=$((cases + 1))
+if [ ! -e "$shared_hooks/pre-push" ]; then
+    fail "uninstaller removed a wrapper from a shared hooks path"
+fi
+rm -rf "$shared_hooks"
 git config --unset core.hooksPath
 
 echo "  HOOKS   commit-msg"
@@ -207,7 +222,7 @@ supposed to enforce, and it does."
 # one character and not three bytes.
 expect 0 "a subject naming a Chinese term" \
     message "Narrow 聯繫 flagging to contact copy"
-expect 1 "the same subject once it is 56 columns wide" \
+expect 1 "the same subject once it is 52 columns wide" \
     message "Narrow 聯繫 flagging to contact copy in 跨海峽 prose"
 
 expect 1 "an em dash in the body" message "Add the repository

@@ -113,7 +113,7 @@ impl super::Scanner {
             }
 
             // Single update point for prev, which is why the per-character
-            // checks live in a function instead of continueing here.
+            // checks live in a function rather than a continue statement.
             prev = Some((offset, ch));
         }
     }

@@ -174,10 +174,12 @@ fi
 # dirty tree is never rewritten by a gate. Four files come along that no lane
 # formats, because a formatter that cannot find its configuration in the copy
 # would judge the copy by different rules than the ones that wrote the tree:
-# Cargo.toml, which cargo fmt reads to find the crate; .editorconfig, which
-# shfmt reads for the style; .clang-format, which commentflow reads for the
-# column limit; and scripts/schema-facts.json, without which check-ruleset.py
-# refuses to run at all.
+# Cargo.toml, which cargo fmt reads to find the crate; rust-toolchain.toml,
+# without which rustup hands the copy whatever toolchain is default and the two
+# runs disagree about which rustfmt they mean; .editorconfig, which shfmt reads
+# for the style; .clang-format, which commentflow reads for the column limit;
+# and scripts/schema-facts.json, without which check-ruleset.py refuses to run
+# at all.
 work=$(mktemp -d) || exit 2
 
 # The signal traps exit rather than falling through: a handler that only cleans
@@ -194,8 +196,8 @@ files=$(printf '%s\n%s\n%s\n%s\n' "$rust" "$shell" "$python" "$ruleset" | grep -
 # than a pipe, because a shell pipeline reports only its last command and a
 # failed pack behind a successful unpack is an empty copy that every later step
 # then reads as formatting drift.
-printf '%s\n%s\n%s\n%s\n%s\n' "$files" Cargo.toml .editorconfig .clang-format \
-    scripts/schema-facts.json \
+printf '%s\n%s\n%s\n%s\n%s\n%s\n' "$files" Cargo.toml rust-toolchain.toml \
+    .editorconfig .clang-format scripts/schema-facts.json \
     | tar -cf "$work.tar" -T - || exit 2
 (cd "$work" && tar -xf "$work.tar") || exit 2
 rm -f "$work.tar"

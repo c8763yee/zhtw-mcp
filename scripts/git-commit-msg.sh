@@ -61,12 +61,25 @@ fi
 # message, so stripping them would judge a message nobody commits. Everything
 # below the scissors goes either way: git drops it before storing.
 cleanup=$(git config --get commit.cleanup 2> /dev/null) || cleanup=default
-message=$(sed '/-\{8,\}[[:space:]]*>8[[:space:]]*-\{8,\}/,$d' "$message_file")
-if [ "$cleanup" = verbatim ]; then
-    : # Kept as written, blank lines included: that is what verbatim means.
-else
-    message=$(printf '%s\n' "$message" | git stripspace --strip-comments)
-fi
+
+# Each mode judged the way git stores it. Under verbatim nothing is removed, so
+# the scissors line and everything below it is part of the message. Under
+# whitespace git keeps comment lines and only trims blanks, so stripping them
+# here would judge text nobody commits. The rest drop comments, which is what
+# --strip-comments does.
+case "$cleanup" in
+    verbatim)
+        message=$(cat "$message_file")
+        ;;
+    whitespace)
+        message=$(sed '/-\{8,\}[[:space:]]*>8[[:space:]]*-\{8,\}/,$d' "$message_file" \
+            | git stripspace)
+        ;;
+    *)
+        message=$(sed '/-\{8,\}[[:space:]]*>8[[:space:]]*-\{8,\}/,$d' "$message_file" \
+            | git stripspace --strip-comments)
+        ;;
+esac
 
 # A carriage return at end of line is what an editor writing CRLF leaves behind,
 # not something an author typed, and the control character check below would
@@ -173,9 +186,14 @@ else
     esac
 fi
 
+# Every subject in this log opens with an uppercase letter, and the rule was
+# enforced only against a lowercase one, so a digit or a bracket opened a
+# subject nothing judged.
 case "$subject" in
     [[:space:]]*) error "subject must not start with whitespace" ;;
-    [[:lower:]]*) error "capitalize the subject" ;;
+    [[:upper:]]*) ;;
+    "") ;;
+    *) error "capitalize the subject; it opens with a letter" ;;
 esac
 
 case "$subject" in

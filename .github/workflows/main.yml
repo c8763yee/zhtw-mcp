@@ -182,7 +182,29 @@ jobs:
           echo "base commit $BASE_SHA is not in this checkout" >&2
           exit 1
         fi
-        git rev-list --no-merges "$BASE_SHA..HEAD" | ./scripts/check-commit-log.sh
+        # The checker comes from the base revision rather than the checkout. A
+        # pull request that edits scripts/check-commit-log.sh or the rules it
+        # calls would otherwise be graded by its own copy of them, which is not
+        # a gate. Both scripts land in one directory because the checker finds
+        # the message hook beside itself.
+        #
+        # Falling back to the checkout is not a hole: it only happens when the
+        # base has no checker at all, and a policy that does not exist yet
+        # cannot be weakened by the change introducing it.
+        trusted=$(mktemp -d)
+        for script in check-commit-log.sh git-commit-msg.sh; do
+          if git cat-file -e "$BASE_SHA:scripts/$script" 2>/dev/null; then
+            git show "$BASE_SHA:scripts/$script" > "$trusted/$script"
+          else
+            echo "::notice::$script is new in this change; using its own copy"
+            cp "scripts/$script" "$trusted/$script"
+          fi
+          chmod +x "$trusted/$script"
+        done
+
+        # Merges included, matching the pre-push hook: their subjects are exempt
+        # from the style rules and not from the character ones.
+        git rev-list "$BASE_SHA..HEAD" | "$trusted/check-commit-log.sh"
 
   # Reads Cargo.lock against the RustSec advisory DB. Deliberately has no
   # Swatinem/rust-cache step: this job never compiles the workspace, and sharing

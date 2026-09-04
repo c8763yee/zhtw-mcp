@@ -80,10 +80,13 @@ fn install_git_hooks() {
     // the hooks is itself a change to the directory being watched. This build
     // script already reruns on any change under src, so that is the whole of
     // the price here; "make hooks" is the same install without the watch.
+    // Registered whether or not the directory is there yet. Cargo watches a
+    // path that does not exist and fires when it appears, and on a fresh clone
+    // the directory appears because the line below creates it. Gating on is_dir
+    // left that first build watching nothing, so a hook deleted after it stayed
+    // deleted until some other source changed.
     if let Some(hooks) = hooks_dir(&root) {
-        if hooks.is_dir() {
-            println!("cargo:rerun-if-changed={}", hooks.display());
-        }
+        println!("cargo:rerun-if-changed={}", hooks.display());
     }
     println!("cargo:rerun-if-changed=scripts/install-git-hooks.sh");
 

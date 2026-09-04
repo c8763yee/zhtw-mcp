@@ -54,8 +54,14 @@ fn preserve_mode(dest: &Path, tmp: &tempfile::NamedTempFile) -> std::io::Result<
     std::fs::set_permissions(tmp.path(), std::fs::Permissions::from_mode(mode))
 }
 
-/// Windows has no mode to carry, and the ACL travels with the destination name
-/// rather than with the file, so the rename already does the right thing.
+/// Not implemented off unix, and the gap is real rather than absent: a Windows
+/// replacement keeps the temp file's own security descriptor, so an explicit
+/// ACL somebody set on the destination does not survive. What saves it in
+/// practice is that these files live under the user's own cache and config
+/// directories, where the descriptor is inherited from the parent and the
+/// temp file inherits the same one. Copying a descriptor properly needs a
+/// Windows API this crate does not otherwise link, which is a large dependency
+/// for a case nothing has reported.
 #[cfg(not(unix))]
 fn preserve_mode(_dest: &Path, _tmp: &tempfile::NamedTempFile) -> std::io::Result<()> {
     Ok(())

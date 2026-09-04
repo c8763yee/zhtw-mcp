@@ -55,12 +55,18 @@ trap 'rm -f "$rules" "$spliced"; exit 130' HUP INT TERM
 
 # awk rather than head and tail: an empty message file puts the cut at line 1,
 # and "head -n 0" is an error on the BSD tools macOS ships.
+#
+# The result lands through a rename. Redirecting onto the message file truncates
+# it before the first byte is written, so a failure halfway leaves the author
+# with nothing where their message was.
 spliced=$(mktemp) || exit 0
 {
     awk -v cut="$cut" 'NR < cut' "$message_file"
     cat "$rules"
     awk -v cut="$cut" 'NR >= cut' "$message_file"
-} > "$spliced" && cat "$spliced" > "$message_file"
+} > "$spliced" && cat "$spliced" > "$message_file.tmp" \
+    && mv -f "$message_file.tmp" "$message_file"
+rm -f "$message_file.tmp"
 
 # A helper that could not help must not stop the commit. Every path above that
 # gives up already exits 0, and without this the last line's status becomes the
