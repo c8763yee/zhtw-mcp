@@ -1,11 +1,11 @@
 // Tests for --help and -h.
 //
-// The help texts are the cli:<name> blocks in docs/cli.md, embedded at
-// build time by build.rs.  Tested here in three layers: the block parser
-// itself (included below, so these tests run the same code the build ran),
-// the binary's output against the docs blocks, and the contracts the parser
-// cannot see: the setup host list matching setup::ALL_HOSTS, and help going
-// to stdout with exit code 0.
+// The help texts are the cli:<name> blocks in docs/cli.md, embedded at build
+// time by build.rs. Tested here in three layers: the block parser itself
+// (included below, so these tests run the same code the build ran), the
+// binary's output against the docs blocks, and the contracts the parser cannot
+// see: the setup host list matching setup::ALL_HOSTS, and help going to stdout
+// with exit code 0.
 
 use std::process::{Command, Output, Stdio};
 
@@ -63,8 +63,8 @@ fn extracts_blocks_in_document_order() {
 
 #[test]
 fn strips_the_code_fence_and_surrounding_blank_lines() {
-    // Blank lines on both sides of the fence: the ones outside it and the
-    // ones just inside it are equally not part of the help text.
+    // Blank lines on both sides of the fence: the ones outside it and the ones
+    // just inside it are equally not part of the help text.
     let md = "<!-- cli:a -->\n\n```text\n\nbody\n\n```\n\n<!-- cli:end -->\n";
     let blocks = extract_cli_blocks(md).unwrap();
     assert_eq!(blocks, vec![("a".to_owned(), "body\n".to_owned())]);
@@ -84,8 +84,8 @@ fn fenced_and_unfenced_blocks_end_in_one_newline() {
 
 #[test]
 fn a_fenced_body_keeps_its_interior_blank_lines_and_indent() {
-    // The shape every block in docs/cli.md actually has: a title, a blank
-    // line, then indented columns.  Only the blank lines against the fence go.
+    // The shape every block in docs/cli.md actually has: a title, a blank line,
+    // then indented columns. Only the blank lines against the fence go.
     let md = "<!-- cli:a -->\n```text\nzhtw-mcp a - do a\n\nUsage:\n  zhtw-mcp a <file>\n\nOptions:\n  -h, --help   Show this help\n```\n<!-- cli:end -->\n";
     assert_eq!(
         extract_cli_blocks(md).unwrap(),
@@ -128,6 +128,7 @@ fn malformed_blocks_are_errors() {
             "<!-- cli:a -->\n\n<!-- cli:end -->\n",
             "cli:a block is empty",
         ),
+
         // Every shape below used to build clean and ship a literal backtick
         // into the terminal, because the fence was stripped by position: a
         // leading run of backticks, then whatever run came last.
@@ -143,6 +144,7 @@ fn malformed_blocks_are_errors() {
             "<!-- cli:a -->\n```text\npart1\n```\n\n```text\npart2\n```\n<!-- cli:end -->\n",
             "cli:a block has a second code fence inside it",
         ),
+
         // The fence closed; the prose after it is the line to go and look at,
         // which is not what a "never closes" message would have said.
         (
@@ -186,7 +188,7 @@ fn help_output_matches_the_docs_blocks() {
 #[test]
 fn no_help_message_carries_a_code_fence() {
     // The end of the guarantee the fence stripping exists for, stated against
-    // what the binary prints.  The parser's own tests cannot say this: they
+    // what the binary prints. The parser's own tests cannot say this: they
     // build their input, and docs/cli.md is what actually feeds the binary.
     let mut messages = vec![help_stdout(&["--help"])];
     messages.extend(
@@ -286,15 +288,15 @@ fn listed_hosts(help: &str) -> Vec<&str> {
 
 #[test]
 fn setup_help_lists_every_host_run_setup_accepts() {
-    // Both directions, because each failure hurts a different person.  A host
+    // Both directions, because each failure hurts a different person. A host
     // the help omits is a host nobody finds; a host the help names and setup
     // rejects wastes the time of somebody who followed the instructions.
     //
     // ALL_HOSTS carries the canonical spellings, and translation-guide is
     // handled ahead of them in main.rs, so the expected set is the two
-    // together.  Aliases such as claude-code and translation_guide stay
-    // unlisted on purpose: from_name accepts several spellings per host and
-    // the help names one.
+    // together. Aliases such as claude-code and translation_guide stay unlisted
+    // on purpose: from_name accepts several spellings per host and the help
+    // names one.
     let stdout = help_stdout(&["setup", "--help"]);
     let listed = listed_hosts(&stdout);
 

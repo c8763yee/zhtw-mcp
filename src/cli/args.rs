@@ -213,7 +213,8 @@ const SUBCOMMAND_TOPICS: [(&str, HelpTopic); 6] = [
     ("cache", HelpTopic::Cache),
 ];
 
-/// Return the help topic from the subcommand name, or `Global` if no subcommand is present.
+/// Return the help topic from the subcommand name, or `Global` if no subcommand
+/// is present.
 fn help_topic(args: &[String]) -> Option<HelpTopic> {
     let contain_flag = args.iter().any(|a| a == "--help" || a == "-h");
     if !contain_flag {
@@ -1156,13 +1157,12 @@ mod tests {
 
     #[test]
     fn every_subcommand_row_reaches_the_command_it_names() {
-        // The match below is exhaustive on purpose.  A new Command variant
-        // stops this test compiling until somebody says which help topic it
-        // answers to, and a topic needs a help text, which build.rs will not
-        // accept without a docs block, which each_subcommand_prints_its_own_
-        // message then runs through the binary.  That chain is what makes a
-        // missing SUBCOMMAND_TOPICS row a failure rather than silent global
-        // help.
+        // The match below is exhaustive on purpose. A new Command variant stops
+        // this test compiling until somebody says which help topic it answers
+        // to, and a topic needs a help text, which build.rs will not accept
+        // without a docs block, which each_subcommand_prints_its_own_ message
+        // then runs through the binary. That chain is what makes a missing
+        // SUBCOMMAND_TOPICS row a failure rather than silent global help.
         for (name, topic) in SUBCOMMAND_TOPICS {
             let argv = match name {
                 "lint" => vec![name, "a.md"],
@@ -1191,7 +1191,7 @@ mod tests {
     #[test]
     fn an_empty_argv_parses_as_the_default_command() {
         // The parse helper always supplies argv[0], so this one calls through
-        // directly.  A process exec'd with no argv at all arrives this way.
+        // directly. A process exec'd with no argv at all arrives this way.
         let cli = parse_args(&[]).expect("an empty argv should parse");
         assert!(matches!(cli.command, Command::Server));
     }
@@ -1204,6 +1204,7 @@ mod tests {
         }
         assert_eq!(help_of(&["lint", "a.md", "--help"]), HelpTopic::Lint);
         assert_eq!(help_of(&["setup", "vscode", "--help"]), HelpTopic::Setup);
+
         // A help flag in a value slot is still a request for help: it outranks
         // the rest of the line rather than being recorded as the value.
         assert_eq!(help_of(&["lint", "--format", "--help"]), HelpTopic::Lint);
@@ -1229,10 +1230,10 @@ mod tests {
     fn a_subcommand_name_in_a_global_value_slot_still_picks_the_topic() {
         // The scan for a topic does not know which arguments are values, so a
         // directory or pack literally named after a subcommand selects that
-        // subcommand's help.  Only a global value slot can do this: it is the
-        // only slot ahead of the subcommand, so once the real one appears it
-        // is the first match.  The cost is the wrong help page on a line that
-        // asked for help either way, which is not worth a second table of
+        // subcommand's help. Only a global value slot can do this: it is the
+        // only slot ahead of the subcommand, so once the real one appears it is
+        // the first match. The cost is the wrong help page on a line that asked
+        // for help either way, which is not worth a second table of
         // value-taking flags to keep in sync with the match arms above.
         assert_eq!(help_of(&["--packs-dir", "lint", "--help"]), HelpTopic::Lint);
         assert_eq!(help_of(&["--config", "tm", "--help"]), HelpTopic::Tm);

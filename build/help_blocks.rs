@@ -1,9 +1,9 @@
-// Extraction of the help blocks that the cli:name and cli:end markers wrap
-// in docs/cli.md.  Included by build.rs, which embeds the blocks into the
-// binary, and by tests/cli-help.rs, which exercises the extraction and checks
-// the binary's output against the docs.  One definition, two includers, so
-// the tests run the same code the build ran.  Pure string processing: no
-// filesystem, environment, or network access.
+// Extraction of the help blocks that the cli:name and cli:end markers wrap in
+// docs/cli.md. Included by build.rs, which embeds the blocks into the binary,
+// and by tests/cli-help.rs, which exercises the extraction and checks the
+// binary's output against the docs. One definition, two includers, so the tests
+// run the same code the build ran. Pure string processing: no filesystem,
+// environment, or network access.
 
 /// Extract every marked help block as a `(name, text)` pair, in document
 /// order.
