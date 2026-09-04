@@ -237,20 +237,6 @@ fn help_topic(args: &[String]) -> Option<HelpTopic> {
 /// Pure: no filesystem, environment, or network access.  Defaults that need any
 /// of those are resolved in `run`.
 pub(crate) fn parse_args(args: &[String]) -> Result<Cli> {
-    // Usage:
-    //   zhtw-mcp                                  run MCP server (default paths)
-    //   zhtw-mcp --overrides <path>               custom overrides JSON path
-    //   zhtw-mcp --suppressions <path>            custom suppressions JSON path
-    //   zhtw-mcp --pack <name>                    activate a rule pack (repeatable)
-    //   zhtw-mcp lint <file|--> [--format json|compact]    lint file(s) or stdin
-    //                           [--max-errors N]
-    //                           [--profile P] [--detect-ai]
-    //                           [--content-type plain|markdown|yaml]
-    //   zhtw-mcp setup <host>                     generate agentic editor integration config
-    //   zhtw-mcp pack import <file>               install a pack
-    //   zhtw-mcp pack export <name>               export a pack
-    //   zhtw-mcp pack validate <file>             validate a pack file
-    //   zhtw-mcp pack list                        list available packs
     let mut cli = Cli {
         overrides_path: None,
         suppressions_path: None,
