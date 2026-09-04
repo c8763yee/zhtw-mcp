@@ -199,6 +199,13 @@ expect 1 "a fixup carrying an em dash" \
     message "fixup! Add the scratch repository — badly"
 expect 1 "a merge subject carrying an override" \
     message "$(printf "Merge branch 'topic' \342\200\256 into main")"
+
+# The shape git writes when it merges two revisions by name, which is what the
+# merge ref GitHub builds for a pull request carries. Exempt from the width
+# rule, since 92 columns of two object names is nobody's prose, and held to the
+# character rules like every other message.
+expect 0 "a merge of two revisions by name" \
+    message "Merge e023b4beffd14a005ac196471d6b2a4970d5ead4 into b732125feaee70b86243b63aeb6361b8979f870b"
 expect 1 "a lowercase subject" message "add the scratch repository"
 expect 1 "a past-tense subject" message "Added the scratch repository"
 expect 1 "a subject ending in a period" message "Add the scratch repository."

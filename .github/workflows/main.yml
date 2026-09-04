@@ -166,6 +166,14 @@ jobs:
     - name: Check the commit messages
       env:
         BASE_SHA: ${{ github.event.pull_request.base.sha }}
+
+        # The pull request's own tip, not the checkout's HEAD. For a
+        # pull_request event the checkout is a merge ref that GitHub built to
+        # test the change, and its commit is authored by nobody and subjected
+        # to nothing: "Merge <sha> into <sha>" is 92 columns and belongs to no
+        # author. Ending the range at the head keeps this judging the commits
+        # the change proposes.
+        HEAD_SHA: ${{ github.event.pull_request.head.sha }}
       run: |
         set -euo pipefail
 
@@ -178,10 +186,12 @@ jobs:
 
         # An unfetched base is not an empty range.  Say which one this is rather
         # than reporting "nothing to check" for a check that could not run.
-        if ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
-          echo "base commit $BASE_SHA is not in this checkout" >&2
-          exit 1
-        fi
+        for sha in "$BASE_SHA" "$HEAD_SHA"; do
+          if ! git cat-file -e "${sha}^{commit}" 2>/dev/null; then
+            echo "commit $sha is not in this checkout" >&2
+            exit 1
+          fi
+        done
         # The checker comes from the base revision rather than the checkout. A
         # pull request that edits scripts/check-commit-log.sh or the rules it
         # calls would otherwise be graded by its own copy of them, which is not
@@ -204,7 +214,7 @@ jobs:
 
         # Merges included, matching the pre-push hook: their subjects are exempt
         # from the style rules and not from the character ones.
-        git rev-list "$BASE_SHA..HEAD" | "$trusted/check-commit-log.sh"
+        git rev-list "$BASE_SHA..$HEAD_SHA" | "$trusted/check-commit-log.sh"
 
   # Reads Cargo.lock against the RustSec advisory DB. Deliberately has no
   # Swatinem/rust-cache step: this job never compiles the workspace, and sharing

@@ -167,7 +167,8 @@ fi
 case "$subject" in
     "fixup! "* | "squash! "* | "amend! "*) exit "$failed" ;;
     "Merge branch "* | "Merge branches "* | "Merge tag "* | "Merge commit "* | \
-        "Merge pull request "* | "Merge remote-tracking branch "*) exit "$failed" ;;
+        "Merge pull request "* | "Merge remote-tracking branch "* | \
+        "Merge "*" into "*) exit "$failed" ;;
 esac
 
 if [ -z "$subject" ]; then
