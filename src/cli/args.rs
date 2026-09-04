@@ -245,7 +245,7 @@ pub(crate) fn parse_args(args: &[String]) -> Result<Cli> {
         config_path: None,
         command: Command::Server,
     };
-    if let Some(topic) = help_topic(&args[1..]) {
+    if let Some(topic) = help_topic(args.get(1..).unwrap_or_default()) {
         cli.command = Command::Help(topic);
         return Ok(cli);
     }
@@ -1151,6 +1151,14 @@ mod tests {
         assert_eq!(help_of(&["--pack", "medical", "--help"]), HelpTopic::Global);
         // A help flag outranks an argument that would otherwise be rejected.
         assert_eq!(help_of(&["--nope", "--help"]), HelpTopic::Global);
+    }
+
+    #[test]
+    fn an_empty_argv_parses_as_the_default_command() {
+        // The parse helper always supplies argv[0], so this one calls through
+        // directly.  A process exec'd with no argv at all arrives this way.
+        let cli = parse_args(&[]).expect("an empty argv should parse");
+        assert!(matches!(cli.command, Command::Server));
     }
 
     #[test]
