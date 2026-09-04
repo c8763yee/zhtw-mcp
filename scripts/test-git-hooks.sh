@@ -27,8 +27,13 @@ work=$(mktemp -d) || exit 1
 # script, so the blast radius was every checkout on such a machine.
 GIT_CONFIG_GLOBAL=/dev/null
 GIT_CONFIG_SYSTEM=/dev/null
-HOME=$work
-export GIT_CONFIG_GLOBAL GIT_CONFIG_SYSTEM HOME
+export GIT_CONFIG_GLOBAL GIT_CONFIG_SYSTEM
+
+# HOME is deliberately left alone. These two variables replace both global
+# config paths outright, so redirecting HOME adds nothing to the isolation and
+# takes something away: rustup keeps its toolchains under HOME, so the rustfmt
+# on PATH is a shim that cannot find a toolchain without it. That is how CI
+# failed while every laptop with a rustfmt outside rustup passed.
 
 # Git exports these to a hook it runs, and the pre-commit lane runs this suite
 # when a hook script is staged. Inherited, they point every git command below at
