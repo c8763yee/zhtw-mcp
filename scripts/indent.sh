@@ -44,7 +44,7 @@ list()
     git ls-files --cached --others --exclude-standard -- "$@" | sort -u
 }
 
-rust=$(list 'build.rs' 'src/*.rs' 'tests/*.rs' 'benches/*.rs')
+rust=$(list 'build.rs' 'build/*.rs' 'src/*.rs' 'tests/*.rs' 'benches/*.rs')
 shell=$(list '*.sh')
 python=$(list 'scripts/*.py')
 

@@ -1,6 +1,84 @@
 # CLI usage
 
+The `<!-- cli:<name> -->` … `<!-- cli:end -->` blocks below are the `--help`
+texts: `build.rs` extracts them and embeds them into the binary verbatim, so
+what `zhtw-mcp <name> --help` prints is exactly what this page shows. Edit the
+help here; a missing or malformed block fails the build.
+
+<!-- cli:global -->
+```text
+zhtw-mcp - Traditional Chinese (zh-TW) text linter and MCP server
+
+Usage:
+  zhtw-mcp [GLOBAL OPTIONS]                Run the MCP server over stdio
+  zhtw-mcp [GLOBAL OPTIONS] <COMMAND>
+
+Commands:
+  lint <files|-->     Lint files, directories, or stdin for zh-CN wording
+  convert [files|--]  Convert Simplified Chinese to Traditional and normalize
+  setup <host>        Print MCP integration config for an editor/agent host
+  pack <subcommand>   Manage rule packs (import|export|validate|list)
+  tm <subcommand>     Manage translation memory (list|export|import|clear|record)
+  cache clear         Clear the LLM judgment cache
+
+Global options:
+  --overrides <path>     Custom overrides JSON path (alias: --db)
+  --suppressions <path>  Custom suppressions JSON path
+  --pack <name>          Activate a rule pack (repeatable)
+  --packs-dir <path>     Directory holding installed rule packs
+  --config <path>        Explicit .zhtw-mcp.toml path
+  --verbose              Log at info level
+  --debug                Log at debug level
+  -h, --help             Show this help
+
+Run 'zhtw-mcp <command> --help' for details on a command.
+```
+<!-- cli:end -->
+
 ## Linting files
+
+<!-- cli:lint -->
+```text
+zhtw-mcp lint - lint files, directories, or stdin for zh-CN wording
+
+Usage:
+  zhtw-mcp lint <files|dirs...>            Lint files (directories recurse)
+  zhtw-mcp lint -- < input.txt             Lint stdin
+
+Options:
+  --format <fmt>            Output format: human (default), json, compact,
+                            tabular, sarif
+  --fix[=<mode>]            Apply fixes in place: lexical_safe (default),
+                            orthographic, lexical_contextual
+  --dry-run                 Preview fixes without writing
+  --explain                 Attach cultural/linguistic annotations
+  --profile <p>             Rule profile: base or strict
+  --content-type <ct>       plain, markdown, markdown-scan-code, or yaml
+  --exclude <pattern>       Skip matching paths (repeatable)
+  --max-errors <n>          Fail when errors exceed n
+  --max-warnings <n>        Fail when warnings exceed n
+  --relaxed                 Relax colon and other UI-string-level rules
+  --exempt-blockquotes      Skip Markdown blockquotes
+  --consistency             Report mixed regional usage
+  --baseline <file>         Suppress known issues, fail only on new ones
+  --update-baseline         Rewrite the baseline file from this run
+  --diff-from <ref>         Lint only files changed since a git ref
+  --detect-ai [level]       AI-filler detection; optional low|medium|high
+  --detect-translationese   Translationese scoring
+  --translationese-domain <d>  general|technical|literary|news
+  --detect-style [level]    Both detectors plus a composite scorecard
+                            (requires --format json)
+  --verify                  Confirm ambiguous substitutions via online
+                            translation (sends text to the network,
+                            requires the translate feature)
+  --telemetry               Print stderr summary counters after the run
+  --document-genre <g>      casual|technical|financial; with --detect-ai
+  -h, --help                Show this help
+
+```
+<!-- cli:end -->
+
+### Example
 
 ```bash
 # Single file
@@ -21,7 +99,7 @@ zhtw-mcp lint -- --content-type markdown < input.md
 zhtw-mcp lint -- --content-type markdown-scan-code < input.md  # also lint inside code blocks
 ```
 
-## Auto-fix
+### Auto-fix
 
 ```bash
 zhtw-mcp lint file.md --fix                        # lexical_safe (default)
@@ -73,13 +151,53 @@ success. Process a file if you need both the report and the text.
 Conversion is a whole-document rewrite of Simplified input, where leaving the
 judgment calls half-converted would be the worse outcome.
 
-## Explaining flagged terms
+### Explaining flagged terms
 
 ```bash
 zhtw-mcp lint file.md --explain
 ```
 
 Each issue includes a cultural/linguistic annotation and its English anchor term.
+
+### Scan caching
+
+In lint-only mode (no `--fix`), the CLI automatically caches scan results keyed by file content hash (BLAKE3) and scan parameters. Unchanged files are skipped on subsequent runs. The cache lives at the platform default cache directory (`~/.cache/zhtw-mcp/` on Linux, `~/Library/Caches/zhtw-mcp/` on macOS) with 24-hour TTL and a 2000-entry cap. Caching is disabled when `--fix`, `--verify`, or stdin mode is active.
+
+### Telemetry
+
+Use `--telemetry` with `lint` to print a compact stderr summary after the run:
+
+```bash
+zhtw-mcp lint docs/ --telemetry
+```
+
+This reports processed file count plus total error/warning counts. It does not change stdout formatting or exit-code behavior.
+
+### Network access and `ZHTW_NO_NETWORK`
+
+`zhtw-mcp` is local-only except for `--verify`, which sends the sentence around
+each finding over HTTPS to Google Translate to confirm a flagged term carries
+the meaning its rule claims. Set `ZHTW_NO_NETWORK` to any value other than
+empty or `0` to refuse it:
+
+```bash
+ZHTW_NO_NETWORK=1 zhtw-mcp lint --verify README.md   # exits non-zero, naming the flag
+ZHTW_NO_NETWORK=1 zhtw-mcp lint README.md            # unaffected
+```
+
+The run fails rather than quietly linting without the verification that was
+asked for. The switch covers `lint --verify` and `convert --verify`; ordinary
+linting, fixing and converting never touch the network.
+
+### Output formats
+
+| Format | Flag | Description |
+|--------|------|-------------|
+| `human` | _(default)_ | Colored, multi-line output for terminals |
+| `json` | `--format json` | Machine-readable JSON array |
+| `compact` | `--format compact` | One line per issue |
+| `tabular` | `--format tabular` | Aligned columns for quick scanning |
+| `sarif` | `--format sarif` | SARIF v2.1.0 for GitHub Code Scanning |
 
 ## Inline suppression
 
@@ -112,35 +230,30 @@ mainland_samples:
 
 An unclosed block runs to the end of the file. An unrecognized keyword suppresses nothing, so a typo fails loudly (the issue still fires) rather than silently muting a region.
 
-## Scan caching
+## Translation memory
 
-In lint-only mode (no `--fix`), the CLI automatically caches scan results keyed by file content hash (BLAKE3) and scan parameters. Unchanged files are skipped on subsequent runs. The cache lives at the platform default cache directory (`~/.cache/zhtw-mcp/` on Linux, `~/Library/Caches/zhtw-mcp/` on macOS) with 24-hour TTL and a 2000-entry cap. Caching is disabled when `--fix`, `--verify`, or stdin mode is active.
+The `tm` subcommand manages the translation memory, which records
+disambiguation decisions (the flagged term, the suggestion, and what was
+chosen) so a call made once is reused afterwards.
 
-## Network access and `ZHTW_NO_NETWORK`
+<!-- cli:tm -->
+```text
+zhtw-mcp tm - manage translation memory
 
-`zhtw-mcp` is local-only except for `--verify`, which sends the sentence around
-each finding over HTTPS to Google Translate to confirm a flagged term carries
-the meaning its rule claims. Set `ZHTW_NO_NETWORK` to any value other than
-empty or `0` to refuse it:
+Usage:
+  zhtw-mcp tm list                List recorded entries as JSON
+  zhtw-mcp tm export <file>       Export entries to a file
+  zhtw-mcp tm import <file>       Import entries from a file
+  zhtw-mcp tm clear               Remove all entries
+  zhtw-mcp tm record --found <term> --suggested <term> --chose <term>
+                     [--context <text>]
+                                  Record a disambiguation decision
 
-```bash
-ZHTW_NO_NETWORK=1 zhtw-mcp lint --verify README.md   # exits non-zero, naming the flag
-ZHTW_NO_NETWORK=1 zhtw-mcp lint README.md            # unaffected
+Options:
+  -h, --help            Show this help
+
 ```
-
-The run fails rather than quietly linting without the verification that was
-asked for. The switch covers `lint --verify` and `convert --verify`; ordinary
-linting, fixing and converting never touch the network.
-
-## Telemetry
-
-Use `--telemetry` with `lint` to print a compact stderr summary after the run:
-
-```bash
-zhtw-mcp lint docs/ --telemetry
-```
-
-This reports processed file count plus total error/warning counts. It does not change stdout formatting or exit-code behavior.
+<!-- cli:end -->
 
 ## Judgment cache
 
@@ -150,15 +263,18 @@ LLM-backed disambiguation decisions are also persisted in a separate judgment ca
 zhtw-mcp cache clear
 ```
 
-## Output formats
+<!-- cli:cache -->
+```text
+zhtw-mcp cache - manage the LLM judgment cache
 
-| Format | Flag | Description |
-|--------|------|-------------|
-| `human` | _(default)_ | Colored, multi-line output for terminals |
-| `json` | `--format json` | Machine-readable JSON array |
-| `compact` | `--format compact` | One line per issue |
-| `tabular` | `--format tabular` | Aligned columns for quick scanning |
-| `sarif` | `--format sarif` | SARIF v2.1.0 for GitHub Code Scanning |
+Usage:
+  zhtw-mcp cache clear            Remove all cached disambiguation decisions
+
+Options:
+  -h, --help            Show this help
+
+```
+<!-- cli:end -->
 
 ## CI/CD integration
 
@@ -207,6 +323,27 @@ Discovered by walking from cwd upward to the `.git` root. CLI flags override con
 
 The `convert` subcommand converts Simplified Chinese (zh-CN) text to Traditional Chinese (zh-TW) and then applies the full lint/fix pipeline to normalize vocabulary:
 
+<!-- cli:convert -->
+```text
+zhtw-mcp convert - convert Simplified Chinese (zh-CN) to Traditional (zh-TW)
+
+Converts characters and phrases, then runs the lint/fix pipeline to
+normalize vocabulary.  Corrected output goes to stdout.
+
+Usage:
+  zhtw-mcp convert <file>                  Convert a file
+  zhtw-mcp convert [--] < input.txt        Convert stdin (the default)
+
+Options:
+  --content-type <ct>   plain, markdown, markdown-scan-code, or yaml
+  --verify              Confirm ambiguous substitutions via online
+                        translation (sends text to the network,
+                        requires the translate feature)
+  -h, --help            Show this help
+
+```
+<!-- cli:end -->
+
 ```bash
 # Convert a file (writes corrected output to stdout)
 zhtw-mcp convert file.md
@@ -231,6 +368,23 @@ It is off unless you pass the flag. Build with `--no-default-features` (plus the
 
 ## Editor integration setup
 
+<!-- cli:setup -->
+```text
+zhtw-mcp setup - print MCP integration config for an editor/agent host
+
+Usage:
+  zhtw-mcp setup <host>
+
+Hosts:
+  claude_code, codex, opencode, copilot, cursor, windsurf, cline, continue, generic
+  translation-guide     Print the translation style guide instead
+
+Options:
+  -h, --help            Show this help
+
+```
+<!-- cli:end -->
+
 Generate configuration snippets for MCP-capable editors:
 
 ```bash
@@ -253,6 +407,24 @@ Add to your `.pre-commit-config.yaml`:
 The hook runs `zhtw-mcp lint` on staged Markdown, YAML, and text files.
 
 ## Rule packs
+
+<!-- cli:pack -->
+```text
+zhtw-mcp pack - manage domain-specific rule packs
+
+Usage:
+  zhtw-mcp pack import <file>     Install a pack from a JSON file
+  zhtw-mcp pack export <name>     Export an installed pack to <name>.json
+  zhtw-mcp pack validate <file>   Validate schema and check for issues
+  zhtw-mcp pack list              List installed packs
+
+Activate packs for a run with the global flag: zhtw-mcp --pack <name> lint ...
+
+Options:
+  -h, --help            Show this help
+
+```
+<!-- cli:end -->
 
 Domain-specific rule overlays stored as JSON files in the `packs/` subdirectory. Same schema as `overrides.json`. Layered on top of the base ruleset in `--pack` flag order.
 

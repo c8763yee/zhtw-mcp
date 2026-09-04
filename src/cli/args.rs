@@ -9,6 +9,7 @@
 use anyhow::{Context, Result};
 use std::path::PathBuf;
 
+use crate::cli::help;
 use crate::cli::render::LintFormat;
 
 /// Refused the same way on both subcommands that accept `--verify`, so the
@@ -36,6 +37,34 @@ pub(crate) enum Command {
     Pack { cmd: String, arg: Option<String> },
     Tm(TmArgs),
     CacheClear,
+    Help(HelpTopic),
+}
+
+/// Which help message to print.  A `--help`/`-h` anywhere on the line selects
+/// the topic of the first subcommand name anywhere on the line, or the global
+/// one if there is none.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum HelpTopic {
+    Global,
+    Lint,
+    Convert,
+    Setup,
+    Pack,
+    Tm,
+    Cache,
+}
+
+/// The help message for a topic.
+pub(crate) fn help_text(topic: HelpTopic) -> &'static str {
+    match topic {
+        HelpTopic::Global => help::GLOBAL,
+        HelpTopic::Lint => help::LINT,
+        HelpTopic::Convert => help::CONVERT,
+        HelpTopic::Setup => help::SETUP,
+        HelpTopic::Pack => help::PACK,
+        HelpTopic::Tm => help::TM,
+        HelpTopic::Cache => help::CACHE,
+    }
 }
 
 /// Flags accepted after the `lint` subcommand.  Everything that is not a known
@@ -172,25 +201,44 @@ fn claim(current: &Command, name: &str) -> Result<()> {
     }
 }
 
+/// Subcommand name to help topic.  The `--help` check reads this table once at
+/// the top of the parse loop; adding a row is the whole of wiring help up for a
+/// new subcommand, and the docs cross-check in `build.rs` covers the topic.
+const SUBCOMMAND_TOPICS: [(&str, HelpTopic); 6] = [
+    ("lint", HelpTopic::Lint),
+    ("convert", HelpTopic::Convert),
+    ("setup", HelpTopic::Setup),
+    ("pack", HelpTopic::Pack),
+    ("tm", HelpTopic::Tm),
+    ("cache", HelpTopic::Cache),
+];
+
+/// Return the help topic from the subcommand name, or `Global` if no subcommand
+/// is present.
+fn help_topic(args: &[String]) -> Option<HelpTopic> {
+    let contain_flag = args.iter().any(|a| a == "--help" || a == "-h");
+    if !contain_flag {
+        return None;
+    }
+
+    let topic = args
+        .iter()
+        .find_map(|arg| {
+            SUBCOMMAND_TOPICS
+                .iter()
+                .find(|(name, _)| *name == arg)
+                .map(|(_, topic)| *topic)
+        })
+        .unwrap_or(HelpTopic::Global);
+
+    Some(topic)
+}
+
 /// Parse argv (including argv[0]) into a `Cli`.
 ///
 /// Pure: no filesystem, environment, or network access.  Defaults that need any
 /// of those are resolved in `run`.
 pub(crate) fn parse_args(args: &[String]) -> Result<Cli> {
-    // Usage:
-    //   zhtw-mcp                                  run MCP server (default paths)
-    //   zhtw-mcp --overrides <path>               custom overrides JSON path
-    //   zhtw-mcp --suppressions <path>            custom suppressions JSON path
-    //   zhtw-mcp --pack <name>                    activate a rule pack (repeatable)
-    //   zhtw-mcp lint <file|--> [--format json|compact]    lint file(s) or stdin
-    //                           [--max-errors N]
-    //                           [--profile P] [--detect-ai]
-    //                           [--content-type plain|markdown|yaml]
-    //   zhtw-mcp setup <host>                     generate agentic editor integration config
-    //   zhtw-mcp pack import <file>               install a pack
-    //   zhtw-mcp pack export <name>               export a pack
-    //   zhtw-mcp pack validate <file>             validate a pack file
-    //   zhtw-mcp pack list                        list available packs
     let mut cli = Cli {
         overrides_path: None,
         suppressions_path: None,
@@ -199,6 +247,10 @@ pub(crate) fn parse_args(args: &[String]) -> Result<Cli> {
         config_path: None,
         command: Command::Server,
     };
+    if let Some(topic) = help_topic(args.get(1..).unwrap_or_default()) {
+        cli.command = Command::Help(topic);
+        return Ok(cli);
+    }
     let mut i = 1;
 
     while i < args.len() {
@@ -216,6 +268,7 @@ pub(crate) fn parse_args(args: &[String]) -> Result<Cli> {
                 i += 1;
                 cli.packs_dir = Some(path_value(args.get(i), "--packs-dir requires a path")?);
             }
+
             "lint" => {
                 claim(&cli.command, "lint")?;
                 let (lint, used) = parse_lint(&args[i + 1..])?;
@@ -1066,5 +1119,123 @@ mod tests {
             parse(&["--verbose", "--debug"]).unwrap().command,
             Command::Server
         ));
+    }
+
+    /// The topic `argv` asks for, or a panic if it does not ask for help.
+    fn help_of(argv: &[&str]) -> HelpTopic {
+        match parse(argv).expect("parse should succeed").command {
+            Command::Help(topic) => topic,
+            _ => panic!("expected a help command from {argv:?}"),
+        }
+    }
+
+    fn asks_for_help(argv: &[&str]) -> bool {
+        matches!(
+            parse(argv).expect("parse should succeed").command,
+            Command::Help(_)
+        )
+    }
+
+    #[test]
+    fn a_line_without_a_help_flag_never_prints_help() {
+        assert!(!asks_for_help(&[]));
+        assert!(!asks_for_help(&["lint", "a.md"]));
+        assert!(!asks_for_help(&["--pack", "medical", "lint", "a.md"]));
+        assert!(!asks_for_help(&["tm", "list"]));
+        // "help" is a word, not a flag, and no subcommand is spelled that way.
+        assert!(err_of(&["help"]).contains("unknown argument"));
+    }
+
+    #[test]
+    fn a_help_flag_with_no_subcommand_selects_the_global_topic() {
+        assert_eq!(help_of(&["--help"]), HelpTopic::Global);
+        assert_eq!(help_of(&["-h"]), HelpTopic::Global);
+        assert_eq!(help_of(&["--pack", "medical", "--help"]), HelpTopic::Global);
+        // A help flag outranks an argument that would otherwise be rejected.
+        assert_eq!(help_of(&["--nope", "--help"]), HelpTopic::Global);
+    }
+
+    #[test]
+    fn every_subcommand_row_reaches_the_command_it_names() {
+        // The match below is exhaustive on purpose. A new Command variant stops
+        // this test compiling until somebody says which help topic it answers
+        // to, and a topic needs a help text, which build.rs will not accept
+        // without a docs block, which each_subcommand_prints_its_own_ message
+        // then runs through the binary. That chain is what makes a missing
+        // SUBCOMMAND_TOPICS row a failure rather than silent global help.
+        for (name, topic) in SUBCOMMAND_TOPICS {
+            let argv = match name {
+                "lint" => vec![name, "a.md"],
+                "convert" => vec![name],
+                "setup" => vec![name, "cursor"],
+                "pack" => vec![name, "list"],
+                "tm" => vec![name, "list"],
+                "cache" => vec![name, "clear"],
+                _ => panic!("give the new subcommand {name} an argv here"),
+            };
+            let reached = match parse(&argv).expect("should parse").command {
+                Command::Lint(_) => HelpTopic::Lint,
+                Command::Convert(_) => HelpTopic::Convert,
+                Command::Setup(_) => HelpTopic::Setup,
+                Command::Pack { .. } => HelpTopic::Pack,
+                Command::Tm(_) => HelpTopic::Tm,
+                Command::CacheClear => HelpTopic::Cache,
+                Command::Server | Command::Help(_) => {
+                    panic!("{name} should parse as a subcommand")
+                }
+            };
+            assert_eq!(reached, topic, "{name}");
+        }
+    }
+
+    #[test]
+    fn an_empty_argv_parses_as_the_default_command() {
+        // The parse helper always supplies argv[0], so this one calls through
+        // directly. A process exec'd with no argv at all arrives this way.
+        let cli = parse_args(&[]).expect("an empty argv should parse");
+        assert!(matches!(cli.command, Command::Server));
+    }
+
+    #[test]
+    fn a_help_flag_after_a_subcommand_selects_that_subcommand() {
+        for (name, topic) in SUBCOMMAND_TOPICS {
+            assert_eq!(help_of(&[name, "--help"]), topic, "{name}");
+            assert_eq!(help_of(&[name, "-h"]), topic, "{name}");
+        }
+        assert_eq!(help_of(&["lint", "a.md", "--help"]), HelpTopic::Lint);
+        assert_eq!(help_of(&["setup", "vscode", "--help"]), HelpTopic::Setup);
+
+        // A help flag in a value slot is still a request for help: it outranks
+        // the rest of the line rather than being recorded as the value.
+        assert_eq!(help_of(&["lint", "--format", "--help"]), HelpTopic::Lint);
+        assert_eq!(
+            help_of(&["tm", "record", "--found", "a", "--context", "-h"]),
+            HelpTopic::Tm
+        );
+    }
+
+    #[test]
+    fn a_subcommand_topic_outranks_the_global_one() {
+        assert_eq!(help_of(&["--help", "lint", "--help"]), HelpTopic::Lint);
+        assert_eq!(help_of(&["-h", "convert", "-h"]), HelpTopic::Convert);
+        assert_eq!(
+            help_of(&["--pack", "medical", "--help", "tm", "--help"]),
+            HelpTopic::Tm
+        );
+        // The subcommand need not carry a help flag of its own.
+        assert_eq!(help_of(&["--help", "pack"]), HelpTopic::Pack);
+    }
+
+    #[test]
+    fn a_subcommand_name_in_a_global_value_slot_still_picks_the_topic() {
+        // The scan for a topic does not know which arguments are values, so a
+        // directory or pack literally named after a subcommand selects that
+        // subcommand's help. Only a global value slot can do this: it is the
+        // only slot ahead of the subcommand, so once the real one appears it is
+        // the first match. The cost is the wrong help page on a line that asked
+        // for help either way, which is not worth a second table of
+        // value-taking flags to keep in sync with the match arms above.
+        assert_eq!(help_of(&["--packs-dir", "lint", "--help"]), HelpTopic::Lint);
+        assert_eq!(help_of(&["--config", "tm", "--help"]), HelpTopic::Tm);
     }
 }
