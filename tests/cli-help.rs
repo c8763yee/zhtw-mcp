@@ -72,11 +72,27 @@ fn strips_the_code_fence_and_surrounding_blank_lines() {
 
 #[test]
 fn fenced_and_unfenced_blocks_end_in_one_newline() {
+    // Against a literal, not against each other: comparing the two parser
+    // outputs moved both sides together, so dropping the newline or adding a
+    // second one passed just as well as getting it right.
+    let want = vec![("a".to_owned(), "body\n".to_owned())];
     let fenced = "<!-- cli:a -->\n```text\nbody\n\n```\n<!-- cli:end -->\n";
     let bare = "<!-- cli:a -->\nbody\n<!-- cli:end -->\n";
+    assert_eq!(extract_cli_blocks(fenced).unwrap(), want);
+    assert_eq!(extract_cli_blocks(bare).unwrap(), want);
+}
+
+#[test]
+fn a_fenced_body_keeps_its_interior_blank_lines_and_indent() {
+    // The shape every block in docs/cli.md actually has: a title, a blank
+    // line, then indented columns.  Only the blank lines against the fence go.
+    let md = "<!-- cli:a -->\n```text\nzhtw-mcp a - do a\n\nUsage:\n  zhtw-mcp a <file>\n\nOptions:\n  -h, --help   Show this help\n```\n<!-- cli:end -->\n";
     assert_eq!(
-        extract_cli_blocks(fenced).unwrap(),
-        extract_cli_blocks(bare).unwrap()
+        extract_cli_blocks(md).unwrap(),
+        vec![(
+            "a".to_owned(),
+            "zhtw-mcp a - do a\n\nUsage:\n  zhtw-mcp a <file>\n\nOptions:\n  -h, --help   Show this help\n".to_owned()
+        )]
     );
 }
 
@@ -163,6 +179,25 @@ fn help_output_matches_the_docs_blocks() {
             &help_stdout(&args),
             text,
             "{args:?} should print the cli:{name} block of docs/cli.md"
+        );
+    }
+}
+
+#[test]
+fn no_help_message_carries_a_code_fence() {
+    // The end of the guarantee the fence stripping exists for, stated against
+    // what the binary prints.  The parser's own tests cannot say this: they
+    // build their input, and docs/cli.md is what actually feeds the binary.
+    let mut messages = vec![help_stdout(&["--help"])];
+    messages.extend(
+        subcommands()
+            .iter()
+            .map(|name| help_stdout(&[name.as_str(), "--help"])),
+    );
+    for message in messages {
+        assert!(
+            !message.contains("```"),
+            "a help message printed a code fence:\n{message}"
         );
     }
 }
