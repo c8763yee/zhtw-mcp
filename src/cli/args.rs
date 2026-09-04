@@ -40,8 +40,9 @@ pub(crate) enum Command {
     Help(HelpTopic),
 }
 
-/// Which help message to print.  `--help`/`-h` anywhere after a subcommand
-/// selects that subcommand's topic; otherwise the global one.
+/// Which help message to print.  A `--help`/`-h` anywhere on the line selects
+/// the topic of the first subcommand name anywhere on the line, or the global
+/// one if there is none.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum HelpTopic {
     Global,
