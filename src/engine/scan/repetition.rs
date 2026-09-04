@@ -9,7 +9,13 @@
 use super::super::excluded::{is_excluded, ByteRange};
 use crate::rules::ruleset::{Issue, IssueType, Severity};
 
-/// CJK reduplications (疊詞) that are legitimate and should not be flagged.
+/// Lexicalized reduplications common enough that an Info line is not worth
+/// printing. Suppression only: since "deduplication_suggestion" stopped
+/// offering a fix for short units, nothing here decides a rewrite.
+///
+/// Not a test for legitimacy, which the comment on that function explains no
+/// lexicon can be: reduplication is productive, so this list is a sample of a
+/// class it cannot close.
 static REDUPLICATION_WHITELIST: &[&str] = &[
     // Family/people
     "媽媽",
@@ -137,6 +143,25 @@ static REDUPLICATION_WHITELIST: &[&str] = &[
     "矇矇",
 ];
 
+/// What to offer for a repeated unit.
+///
+/// A repeated one- or two-character unit is as often morphology as it is a
+/// mistake: 研究研究, 討論討論, 整整一百年 and 錯字連連 are correct zh-TW, and
+/// no lexical test separates them from a stutter without a dictionary.
+/// Deleting the second copy is silent corruption, so short units are reported
+/// without a suggestion and a human decides. Function characters are no
+/// exception, which is what makes the allowlist above unfixable rather than
+/// merely incomplete: 的的確確, 不了了之, 是是非非 and 在在顯示 all reduplicate
+/// a particle. Three-character units are long enough that reduplication does
+/// not reach them, so a copy-paste duplicate is the only reading left.
+fn deduplication_suggestion(unit: &str) -> Vec<String> {
+    if unit.chars().count() >= 3 {
+        vec![unit.to_string()]
+    } else {
+        Vec::new()
+    }
+}
+
 fn is_cjk(ch: char) -> bool {
     ('\u{4e00}'..='\u{9fff}').contains(&ch)
 }
@@ -252,7 +277,7 @@ fn scan_cjk_duplicates(text: &str, excluded: &[ByteRange], issues: &mut Vec<Issu
                 start,
                 end - start,
                 matched.to_string(),
-                vec![unit.to_string()],
+                deduplication_suggestion(unit),
                 IssueType::Repetition,
                 Severity::Info,
             ));
@@ -357,12 +382,32 @@ mod tests {
         issues
     }
 
+    // A short CJK unit is reported but carries no suggestion: reduplication is
+    // productive in Chinese, so the fixer must not delete the second copy.
     #[test]
     fn catches_cjk_single_char_duplicate() {
         let issues = scan("去去都知道");
         assert_eq!(issues.len(), 1);
         assert_eq!(issues[0].found, "去去");
-        assert_eq!(issues[0].suggestions.as_ref(), ["去"]);
+        assert!(issues[0].suggestions.is_empty());
+    }
+
+    #[test]
+    fn productive_reduplication_is_reported_without_a_fix() {
+        for text in [
+            "這件事我們研究研究。",
+            "大家一起討論討論吧。",
+            "整整一百年過去了。",
+            "錯字連連。",
+            "《茜茜公主》是經典。",
+            "形形色色的人。",
+        ] {
+            let issues = scan(text);
+            assert!(
+                issues.iter().all(|i| i.suggestions.is_empty()),
+                "offered to delete productive reduplication in {text}: {issues:?}"
+            );
+        }
     }
 
     #[test]
@@ -456,7 +501,9 @@ mod tests {
         let issues = scan("作業作業完成了");
         assert_eq!(issues.len(), 1);
         assert_eq!(issues[0].found, "作業作業");
-        assert_eq!(issues[0].suggestions.as_ref(), ["作業"]);
+        // 作業作業 reads as a duplicate here, but 研究研究 is grammar and the
+        // two are indistinguishable without a dictionary, so neither is fixed.
+        assert!(issues[0].suggestions.is_empty());
     }
 
     #[test]

@@ -49,70 +49,47 @@ pub fn normalize_nfc(input: &str) -> Normalized<'_> {
         _ => {} // No or Maybe-and-not-NFC: proceed to normalize below
     }
 
-    // Normalize the full string at once (NFC requires seeing combining
-    // sequences in context, not per-char).
-    let nfc_text: String = input.nfc().collect();
+    // Build the offset mapping one normalization segment at a time.
+    //
+    // A segment is a starter plus the combining marks that follow it, which is
+    // the largest unit NFC can rewrite: composition never joins two starters
+    // (Hangul jamo excepted, handled below) and canonical reordering never
+    // moves a mark past one. Normalizing each segment separately therefore
+    // concatenates to the same string as normalizing the whole input, and
+    // every byte it produces belongs to that one segment.
+    //
+    // The previous version walked output chars and skipped any original
+    // combining mark that did not equal the current one, assuming it had been
+    // absorbed. A mark can also expand: U+0344 becomes U+0308 U+0301, one char
+    // into two. The skip then consumed the following base character, and every
+    // offset after it pointed at the wrong place, so a fix wrote its
+    // replacement over neighbouring text.
+    // The normalized text is assembled from the same segments the map is
+    // built from, so it is produced once rather than normalized whole and
+    // then again per segment.
+    let mut nfc_text = String::with_capacity(input.len());
+    let mut offset_map = Vec::with_capacity(input.len() + 1);
+    let mut segment_start = 0usize;
+    let mut prev: Option<char> = None;
 
-    // Build offset mapping by aligning original and normalized chars.
-    // Strategy: walk both char sequences in parallel. Each NFC output char
-    // originated from one or more original chars. We map output bytes to
-    // the original byte position of the first contributing char.
-    let mut offset_map = Vec::with_capacity(nfc_text.len() + 1);
-
-    let orig_chars: Vec<(usize, char)> = input.char_indices().collect();
-    let nfc_chars: Vec<char> = nfc_text.chars().collect();
-
-    let mut orig_idx = 0;
-
-    for &nfc_char in &nfc_chars {
-        // 1. Skip combining marks in 'orig' that were absorbed/reordered
-        // (i.e., don't match current nfc_char).
-        while orig_idx < orig_chars.len() {
-            let ch = orig_chars[orig_idx].1;
-            if is_combining_mark(ch) {
-                if ch == nfc_char {
-                    // Found a combining mark that matches current NFC char.
-                    // Stop skipping. It will be consumed as the "base" of this mapping.
-                    break;
-                }
-                // Combining mark that doesn't match. Must be absorbed/reordered.
-                // Skip it.
-                orig_idx += 1;
-            } else {
-                // Found a base char. Stop skipping.
-                break;
-            }
+    for (i, ch) in input.char_indices() {
+        if i > 0 && starts_segment(ch, prev) {
+            map_segment(
+                &input[segment_start..i],
+                segment_start,
+                &mut nfc_text,
+                &mut offset_map,
+            );
+            segment_start = i;
         }
-
-        // 2. Map current nfc_char to whatever orig_idx is pointing at.
-        let orig_byte = if orig_idx < orig_chars.len() {
-            orig_chars[orig_idx].0
-        } else {
-            input.len()
-        };
-
-        // Map each byte of this NFC char to the original position.
-        let char_len = nfc_char.len_utf8();
-        for _ in 0..char_len {
-            offset_map.push(orig_byte);
-        }
-
-        // 3. Consume the char at orig_idx (Base or Matching Combining) and
-        //    any combining marks that were absorbed into it by NFC composition.
-        //    The NFD decomposition of nfc_char tells us how many original chars
-        //    it consumed: nfd_count − 1 combining marks follow the base.
-        if orig_idx < orig_chars.len() {
-            orig_idx += 1;
-            let absorbed = std::iter::once(nfc_char).nfd().count().saturating_sub(1);
-            for _ in 0..absorbed {
-                if orig_idx < orig_chars.len() && is_combining_mark(orig_chars[orig_idx].1) {
-                    orig_idx += 1;
-                } else {
-                    break;
-                }
-            }
-        }
+        prev = Some(ch);
     }
+    map_segment(
+        &input[segment_start..],
+        segment_start,
+        &mut nfc_text,
+        &mut offset_map,
+    );
 
     // End-of-string sentinel.
     offset_map.push(input.len());
@@ -123,20 +100,113 @@ pub fn normalize_nfc(input: &str) -> Normalized<'_> {
     }
 }
 
-/// Returns true if ch is a Unicode combining mark (general categories M*).
+/// Map one segment's normalized bytes back to original offsets.
+///
+/// Everything composed into the base maps to the segment start, which is the
+/// position a reader wants for a span. Trailing combining marks that survive
+/// normalization are paired against the input's trailing marks counted from
+/// the end, so a mark NFC could not absorb points into the mark run rather
+/// than at the base.
+///
+/// Pairing by position, not by identity, and that is a deliberate ceiling. The
+/// map has to be non-decreasing, because a span is translated by indexing it,
+/// while canonical reordering is by definition a permutation: in
+/// "a\u{0344}\u{0316}" the surviving U+0301 comes from the mark at byte 1 but
+/// NFC emits it after the mark from byte 3. No monotonic map can say that, so
+/// this one points each surviving mark at the input mark in the same position
+/// from the end.
+///
+/// The base's end boundary inherits that: in "e\u{0316}\u{0301}" the base
+/// composes with the mark at byte 3 while the mark at byte 1 survives, so the
+/// boundary after the base names byte 3 and a replacement of the base alone
+/// would cover a mark that is still in the output. There is no monotonic
+/// assignment that avoids this, because the consumed mark sits after the
+/// surviving one in the input and before it in the output. The error stays
+/// inside one combining run, and no rule in this linter targets a bare
+/// combining sequence, so it costs nothing today. Fixing it means per-span
+/// provenance instead of a byte map, and a different lookup everywhere.
+fn map_segment(segment: &str, start: usize, nfc_text: &mut String, offset_map: &mut Vec<usize>) {
+    let before = nfc_text.len();
+    nfc_text.extend(segment.nfc());
+    let normalized = &nfc_text[before..];
+
+    // Both tails run backward from the end, so zip pairs the marks that
+    // correspond. Everything composed into the base maps to the segment start.
+    let origins: Vec<usize> = segment
+        .char_indices()
+        .rev()
+        .take_while(|&(_, c)| is_combining_mark(c))
+        .map(|(i, _)| start + i)
+        .collect();
+    let tail: Vec<usize> = normalized
+        .chars()
+        .rev()
+        .take_while(|&c| is_combining_mark(c))
+        .map(char::len_utf8)
+        .collect();
+
+    let tail_bytes: usize = tail.iter().sum();
+    offset_map.resize(offset_map.len() + normalized.len() - tail_bytes, start);
+    for (i, &n) in tail.iter().enumerate().rev() {
+        // NFC can expand one input mark into several output marks (U+0344),
+        // leaving more output marks than input ones. The shift pairs the two
+        // runs from the end, so the excess falls on the last input mark, which
+        // is right when that is the mark that expanded and keeps the excess
+        // inside the mark run either way. Never on the segment's base: an
+        // output mark did not come from there.
+        let origin = origins
+            .get(i.saturating_sub(tail.len().saturating_sub(origins.len())))
+            .copied()
+            .unwrap_or(start);
+        offset_map.resize(offset_map.len() + n, origin);
+    }
+}
+
+/// Whether "ch" begins a new normalization segment, given the character
+/// before it.
+///
+/// A combining mark never does. Neither does a Hangul jamo that composes with
+/// what precedes it, which is the one case where two starters combine.
+///
+/// The pair has to be one Hangul composition actually forms, not merely two
+/// Hangul characters. Refusing to split any adjacent pair swallowed a run of
+/// complete syllables into one segment, and a segment maps every byte that is
+/// not a trailing mark to its start, so 각각각 reported all three syllables at
+/// the offset of the first and a fix would have rewritten the wrong one.
+fn starts_segment(ch: char, prev: Option<char>) -> bool {
+    if is_combining_mark(ch) {
+        return false;
+    }
+    let Some(prev) = prev else {
+        return true;
+    };
+    // UAX #15 Hangul composition, the only case where a starter joins another:
+    // a leading jamo takes a vowel, and an LV syllable takes a trailing jamo.
+    // Two complete syllables never compose, so they are separate segments.
+    const L: std::ops::RangeInclusive<u32> = 0x1100..=0x1112;
+    const V: std::ops::RangeInclusive<u32> = 0x1161..=0x1175;
+    const T: std::ops::RangeInclusive<u32> = 0x11A8..=0x11C2;
+    const S: std::ops::RangeInclusive<u32> = 0xAC00..=0xD7A3;
+    let (prev, cur) = (u32::from(prev), u32::from(ch));
+    // The trailing jamo follows a vowel as well as an LV syllable, because the
+    // walk sees the source characters: in L V T the character before T is the
+    // vowel, and the L+V it composed with is not written down anywhere.
+    let composes = (L.contains(&prev) && V.contains(&cur))
+        || (V.contains(&prev) && T.contains(&cur))
+        || (S.contains(&prev) && (prev - S.start()).is_multiple_of(28) && T.contains(&cur));
+    !composes
+}
+
+/// Whether the character is a Unicode combining mark (General_Category=Mark).
+///
+/// From the normalization tables that are already linked for NFC, not a
+/// hand-listed set of blocks. The block list covered five ranges and missed
+/// Arabic, Hebrew, Devanagari and Cyrillic marks, which made those characters
+/// look like segment starters: an Arabic alef followed by a maddah then
+/// composes inside "nfc()" but not across the split segments, and the offset
+/// map ends up longer than the string it indexes.
 fn is_combining_mark(ch: char) -> bool {
-    // Combining Diacritical Marks: U+0300..U+036F
-    // Combining Diacritical Marks Extended: U+1AB0..U+1AFF
-    // Combining Diacritical Marks Supplement: U+1DC0..U+1DFF
-    // Combining Diacritical Marks for Symbols: U+20D0..U+20FF
-    // Combining Half Marks: U+FE20..U+FE2F
-    matches!(ch,
-        '\u{0300}'..='\u{036F}' |
-        '\u{1AB0}'..='\u{1AFF}' |
-        '\u{1DC0}'..='\u{1DFF}' |
-        '\u{20D0}'..='\u{20FF}' |
-        '\u{FE20}'..='\u{FE2F}'
-    )
+    unicode_normalization::char::is_combining_mark(ch)
 }
 
 /// Map a byte offset in normalized text back to the original text.
@@ -253,5 +323,103 @@ mod tests {
         assert_eq!(map_offset(&norm.offset_map, 0), 0);
         // The remaining U+0301 at NFC byte 2 maps to orig byte 3 (second mark).
         assert_eq!(map_offset(&norm.offset_map, 2), 3);
+    }
+
+    // Two complete Hangul syllables do not compose, so they are separate
+    // segments. Coalescing them mapped every byte of the run to the offset of
+    // the first syllable.
+    #[test]
+    fn adjacent_hangul_syllables_keep_their_own_offsets() {
+        let norm = normalize_nfc("각각각 e\u{0301}");
+        assert_eq!(map_offset(&norm.offset_map, 0), 0);
+        assert_eq!(map_offset(&norm.offset_map, 3), 3);
+        assert_eq!(map_offset(&norm.offset_map, 6), 6);
+    }
+
+    // The pairs that do compose still must not be split: the walk sees source
+    // characters, so the trailing jamo follows the vowel, not the LV syllable
+    // the two of them will become.
+    #[test]
+    fn decomposed_hangul_jamo_still_compose() {
+        let norm = normalize_nfc("\u{1100}\u{1161}\u{11A8} e\u{0301}");
+        assert_eq!(norm.text, "\u{AC01} \u{00E9}");
+    }
+
+    #[test]
+    fn expanded_combining_mark_maps_to_its_source() {
+        let input = "中\u{0344}b";
+        let norm = normalize_nfc(input);
+        assert_eq!(norm.text, "中\u{0308}\u{0301}b");
+        assert_eq!(map_offset(&norm.offset_map, 3), 3);
+        assert_eq!(map_offset(&norm.offset_map, 5), 3);
+        assert_eq!(map_offset(&norm.offset_map, 7), 5);
+    }
+}
+
+#[cfg(test)]
+mod invariants {
+    use super::*;
+    use unicode_normalization::UnicodeNormalization;
+
+    /// Deterministic xorshift, so a failure is reproducible from the seed.
+    struct Rng(u64);
+    impl Rng {
+        fn next(&mut self) -> u64 {
+            self.0 ^= self.0 << 13;
+            self.0 ^= self.0 >> 7;
+            self.0 ^= self.0 << 17;
+            self.0
+        }
+        fn pick<T: Copy>(&mut self, from: &[T]) -> T {
+            from[(self.next() % from.len() as u64) as usize]
+        }
+    }
+
+    // The offset map is what every reported span is translated through, so a
+    // single wrong entry writes a fix over neighbouring text. Four properties
+    // have to hold for any input, and the alphabet below is chosen to exercise
+    // the cases the segment walk reasons about: composing pairs, a mark that
+    // expands into two (U+0344), canonical reordering across combining
+    // classes, Hangul jamo that compose across starters, and scripts whose
+    // marks the old block list missed.
+    #[test]
+    fn the_offset_map_holds_for_random_input() {
+        const ALPHABET: &[char] = &[
+            'a', 'e', '中', 'b', '\u{0301}', '\u{0300}', '\u{0308}', '\u{0344}', '\u{0315}',
+            '\u{05B0}', '\u{0654}', '\u{093C}', '\u{094D}', '\u{0915}', '\u{1100}', '\u{1161}',
+            '\u{11A8}', '\u{AC00}', 'ا', 'ب', ' ', '。',
+        ];
+        let mut rng = Rng(0x9E3779B97F4A7C15);
+        for case in 0..200_000u32 {
+            let len = (rng.next() % 8) as usize;
+            let input: String = (0..len).map(|_| rng.pick(ALPHABET)).collect();
+            let norm = normalize_nfc(&input);
+
+            let expected: String = input.nfc().collect();
+            assert_eq!(&*norm.text, expected, "case {case}: {input:?}");
+
+            if norm.offset_map.is_empty() {
+                // Fast path: identity, only taken when the input is already NFC.
+                assert_eq!(&*norm.text, input, "case {case}: {input:?}");
+                continue;
+            }
+
+            assert_eq!(
+                norm.offset_map.len(),
+                norm.text.len() + 1,
+                "case {case}: map length must cover every byte plus the sentinel: {input:?}"
+            );
+            assert!(
+                norm.offset_map.windows(2).all(|w| w[0] <= w[1]),
+                "case {case}: map must not run backwards: {input:?} -> {:?}",
+                norm.offset_map
+            );
+            for (i, &origin) in norm.offset_map.iter().enumerate() {
+                assert!(
+                    origin <= input.len() && input.is_char_boundary(origin),
+                    "case {case}: entry {i} = {origin} is not a char boundary in {input:?}"
+                );
+            }
+        }
     }
 }

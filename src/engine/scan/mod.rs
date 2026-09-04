@@ -43,7 +43,8 @@ use serde::{Deserialize, Serialize};
 
 use super::zhtype::ChineseType;
 use crate::rules::ruleset::{
-    CaseRule, Issue, IssueType, Profile, ProfileConfig, RuleType, Severity, SpellingRule,
+    CaseRule, Issue, IssueType, PhaseFamily, PhasePass, Profile, ProfileConfig, RuleType, Severity,
+    SpellingRule,
 };
 
 use self::ellipsis::scan_ellipsis;
@@ -242,17 +243,18 @@ const MIN_SCAN_CLUE_MATCHES: usize = 1;
 const POSITIONAL_WINDOW_CHARS: usize = 20;
 
 fn dedup_translationese_phase_duplicates(issues: &mut Vec<Issue>) {
-    let indexed_spans: Vec<(&'static str, usize, usize)> = issues
+    let indexed_spans: Vec<(PhaseFamily, usize, usize)> = issues
         .iter()
-        .filter_map(|issue| {
-            translationese_phase_family(issue).and_then(|(family, phase_rank)| {
-                (phase_rank == 1).then_some((family, issue.offset, issue.offset + issue.length))
-            })
+        .filter_map(|issue| match issue.phase_family {
+            Some((family, PhasePass::Indexed)) => {
+                Some((family, issue.offset, issue.offset + issue.length))
+            }
+            _ => None,
         })
         .collect();
 
-    issues.retain(|issue| match translationese_phase_family(issue) {
-        Some((family, 0)) => {
+    issues.retain(|issue| match issue.phase_family {
+        Some((family, PhasePass::Lexical)) => {
             let start = issue.offset;
             let end = issue.offset + issue.length;
             !indexed_spans
@@ -263,32 +265,6 @@ fn dedup_translationese_phase_duplicates(issues: &mut Vec<Issue>) {
         }
         _ => true,
     });
-}
-
-fn translationese_phase_family(issue: &Issue) -> Option<(&'static str, u8)> {
-    if issue.rule_type != IssueType::Translationese {
-        return None;
-    }
-    let ctx = issue.context.as_deref()?;
-
-    // Order matters: check the boundary-aware (b) variant first so a context
-    // that contains both substrings (e.g. "ZY1b" trivially contains "ZY1")
-    // classifies as the higher-rank variant.
-    if ctx.contains("ZY1b") {
-        Some(("ZY1", 1))
-    } else if ctx.contains("ZY1a") {
-        Some(("ZY1", 0))
-    } else if ctx.contains("ZY2b") {
-        Some(("ZY2", 1))
-    } else if ctx.contains("ZY2a") {
-        Some(("ZY2", 0))
-    } else if ctx.contains("ZY3b") {
-        Some(("ZY3", 1))
-    } else if ctx.contains("ZY3a") {
-        Some(("ZY3", 0))
-    } else {
-        None
-    }
 }
 
 /// A parsed positional condition for disambiguation.
@@ -339,47 +315,55 @@ impl PositionalClue {
 
 // Shared helper functions
 
-/// Returns true if the text between `prev_end` and `offset` contains a
-/// paragraph break (\n\n or \r\n\r\n).
+/// Whether the text between `prev_end` and `offset` holds a paragraph break.
+///
+/// Testing for the two pure forms missed a mixed "\n\r\n", so on such a
+/// document the quote-nesting depth and the ASCII-quote parity never reset and
+/// every suggestion after the break alternated wrongly. Same rule as the
+/// splitters, from the same function.
 fn has_paragraph_break(text: &str, prev_end: usize, offset: usize) -> bool {
-    text.get(prev_end..offset)
-        .is_some_and(|s| s.contains("\n\n") || s.contains("\r\n\r\n"))
+    let Some(window) = text.get(prev_end..offset) else {
+        return false;
+    };
+    let bytes = window.as_bytes();
+    bytes
+        .iter()
+        .enumerate()
+        .any(|(i, &b)| b == b'\n' && crate::engine::sentence::blank_line_end(bytes, i).is_some())
 }
 
 /// Split text into paragraph blocks at double-newline boundaries.
 ///
 /// Returns (byte_offset, paragraph_slice) pairs. Handles both \n\n (LF)
 /// and \r\n\r\n (CRLF) paragraph separators.
-fn split_paragraphs(text: &str) -> Vec<(usize, &str)> {
+pub(super) fn split_paragraphs(text: &str) -> Vec<(usize, &str)> {
     let mut result = Vec::new();
     let mut prev = 0;
     let bytes = text.as_bytes();
-    let len = bytes.len();
     let mut i = 0;
-    while i < len {
-        if i + 3 < len
-            && bytes[i] == b'\r'
-            && bytes[i + 1] == b'\n'
-            && bytes[i + 2] == b'\r'
-            && bytes[i + 3] == b'\n'
-        {
-            result.push((prev, &text[prev..i]));
-            prev = i + 4;
-            i = prev;
-            continue;
-        }
-        if i + 1 < len && bytes[i] == b'\n' && bytes[i + 1] == b'\n' {
-            result.push((prev, &text[prev..i]));
-            prev = i + 2;
-            i = prev;
-            continue;
+    while i < bytes.len() {
+        if bytes[i] == b'\n' {
+            if let Some(next) = crate::engine::sentence::blank_line_end(bytes, i) {
+                result.push((prev, trim_line_end(&text[prev..i])));
+                prev = next;
+                i = prev;
+                continue;
+            }
         }
         i += 1;
     }
     if prev < text.len() {
-        result.push((prev, &text[prev..]));
+        result.push((prev, trim_line_end(&text[prev..])));
     }
     result
+}
+
+/// Drop a paragraph's own trailing line ending.
+///
+/// Callers test exclusion as "is the whole paragraph covered", so a slice that
+/// carries its terminator reaches past the content an exclusion range ends at.
+fn trim_line_end(para: &str) -> &str {
+    para.trim_end_matches(['\r', '\n'])
 }
 
 /// Extract a surrounding text window (in chars) around a byte range.
@@ -833,6 +817,11 @@ pub struct Scanner {
     /// Profile filter used at construction time.  Stored so scan-time
     /// config compatibility can be verified via debug_assert.
     build_filter: rule_ir::ProfileFilter,
+
+    /// Phrases owned by procedural detectors rather than by the lexical pass.
+    /// Built from the unfiltered rule set, so a profile that drops a rule type
+    /// from the automaton does not also empty a detector with its own gate.
+    guards: rule_ir::GuardRules,
 }
 
 impl Scanner {
@@ -977,6 +966,7 @@ impl Scanner {
         // word-boundary vocabulary is not lost when variant/ai_filler rules are
         // excluded from the AC automaton.
         let segmenter = Segmenter::from_rules(&spelling_rules);
+        let guards = rule_ir::GuardRules::build(&spelling_rules);
 
         // Infallible: every automaton build inside logs and falls back to a
         // working alternative rather than propagating. This used to be a match
@@ -1010,6 +1000,7 @@ impl Scanner {
             case_rules,
             segmenter,
             build_filter: *filter,
+            guards,
         }
     }
 
@@ -1167,11 +1158,13 @@ impl Scanner {
         let nfc_changed = !norm.offset_map.is_empty();
 
         let mut output = match prebuilt_excluded {
-            Some(excl) if !nfc_changed => self.scan_with_config(scan_text, excl, cfg),
+            Some(excl) if !nfc_changed => {
+                self.scan_with_config_content_type(scan_text, excl, cfg, content_type)
+            }
             _ => {
                 let excl =
                     build_exclusions_for_content_type_with_config(scan_text, content_type, &cfg);
-                self.scan_with_config(scan_text, &excl, cfg)
+                self.scan_with_config_content_type(scan_text, &excl, cfg, content_type)
             }
         };
 
@@ -1258,8 +1251,18 @@ impl Scanner {
         excluded: &[ByteRange],
         cfg: ProfileConfig,
     ) -> ScanOutput {
+        self.scan_with_config_content_type(text, excluded, cfg, ContentType::Plain)
+    }
+
+    fn scan_with_config_content_type(
+        &self,
+        text: &str,
+        excluded: &[ByteRange],
+        cfg: ProfileConfig,
+        content_type: ContentType,
+    ) -> ScanOutput {
         let mut scratch = ScratchSpace::new();
-        self.scan_with_config_into(text, excluded, cfg, &mut scratch)
+        self.scan_with_config_into_content_type(text, excluded, cfg, content_type, &mut scratch)
     }
 
     /// Lexical and procedural passes: everything that matches on the text
@@ -1353,11 +1356,12 @@ impl Scanner {
             .count()
     }
 
-    /// Scan with a fully-specified ProfileConfig, reusing a caller-provided
-    /// [`ScratchSpace`] to avoid per-scan allocations.
+    /// Scan plain text with a fully-specified ProfileConfig, reusing a
+    /// caller-provided "ScratchSpace" to avoid per-scan allocations.
     ///
-    /// The scratch buffers are cleared at entry; on return the issues live
-    /// in the returned `ScanOutput` (moved out of `scratch.issues`).
+    /// This is the stable hot-loop API. Call
+    /// "scan_with_config_into_content_type" when structural passes need a
+    /// Markdown- or YAML-aware content type.
     pub fn scan_with_config_into(
         &self,
         text: &str,
@@ -1365,7 +1369,29 @@ impl Scanner {
         cfg: ProfileConfig,
         scratch: &mut ScratchSpace,
     ) -> ScanOutput {
+        self.scan_with_config_into_content_type(text, excluded, cfg, ContentType::Plain, scratch)
+    }
+
+    /// Content-type-aware form of "scan_with_config_into".
+    ///
+    /// Kept separately named so adding content-type-aware structural passes
+    /// does not source-break callers of the reusable-scratch API.
+    ///
+    /// The scratch buffers are cleared at entry; on return the issues live
+    /// in the returned `ScanOutput` (moved out of `scratch.issues`).
+    pub fn scan_with_config_into_content_type(
+        &self,
+        text: &str,
+        excluded: &[ByteRange],
+        cfg: ProfileConfig,
+        content_type: ContentType,
+        scratch: &mut ScratchSpace,
+    ) -> ScanOutput {
         self.debug_assert_config_within_build(&cfg);
+
+        // Counts document-scoped index builds for the duration of this scan;
+        // see engine::index_guard. Compiled out of release builds.
+        crate::engine::index_guard::reset();
 
         scratch.clear();
 
@@ -1460,7 +1486,8 @@ impl Scanner {
             rule_ir::inflate_spelling_issues(&self.spelling_db, text, excluded, issues);
         }
 
-        run_structural_passes(text, excluded, issues, &cfg);
+        let mentions =
+            run_structural_passes(text, excluded, issues, &cfg, content_type, &self.guards);
 
         // Fix CN quotation mark pairing with depth-based nesting: well-formed
         // quotes use character-based depth tracking; misordered or
@@ -1482,6 +1509,7 @@ impl Scanner {
                 text,
                 issues,
                 excluded,
+                &mentions,
                 cfg.ai_threshold_multiplier,
             )
         } else {
@@ -1530,6 +1558,8 @@ impl Scanner {
             quality_flags.push("high_oral_density".into());
         }
 
+        crate::engine::index_guard::assert_built_once_per_document();
+
         ScanOutput {
             issues: std::mem::take(issues),
             detected_script: zh_type,
@@ -1555,34 +1585,15 @@ fn run_structural_passes(
     excluded: &[ByteRange],
     issues: &mut Vec<Issue>,
     cfg: &ProfileConfig,
-) {
+    content_type: ContentType,
+    guards: &rule_ir::GuardRules,
+) -> Vec<ByteRange> {
     if cfg.grammar_checks {
         grammar::scan_grammar(text, excluded, issues);
     }
 
-    // AI writing detection grammar checks: semantic safety words, copula
-    // avoidance, passive voice overuse. Separate from the base grammar checks
-    // above, and gated by its own profile flag.
-    if cfg.ai_semantic_safety {
-        grammar::scan_ai_grammar(text, excluded, issues);
-    }
-
-    // Structural AI pattern detection: binary contrast density, paragraph
-    // endings, dash overuse, formulaic headings, list density.
-    if cfg.ai_structural_patterns {
-        grammar::scan_ai_structural(text, excluded, issues, cfg.ai_threshold_multiplier);
-    }
-
-    // Density-based AI phrase detection: a post-scan frequency pass counting
-    // tracked phrases across the whole document, flagging when density passes
-    // per-phrase thresholds. Distinct from per-occurrence filler detection,
-    // since this catches the statistical signature rather than one phrase.
-    if cfg.ai_density_detection {
-        grammar::scan_ai_density(text, excluded, issues, cfg.ai_threshold_multiplier);
-    }
-
-    // Built lazily: only the boundary-aware detectors below need it, and it
-    // costs a pass over the text.
+    // Build boundaries only when an AI structural or translationese detector
+    // needs them. This costs one pass over the text.
     let needs_boundary_index = cfg.ai_structural_patterns || cfg.translationese_detection;
     let boundary_index = if needs_boundary_index {
         Some(BoundaryIndex::build(text, excluded))
@@ -1590,12 +1601,20 @@ fn run_structural_passes(
         None
     };
 
-    // Structural AI pattern detectors (S1-S8, V2 density).
-    if cfg.ai_structural_patterns {
-        if let Some(ref idx) = boundary_index {
-            grammar::scan_ai_structural_phase2(text, excluded, issues, idx);
-        }
-    }
+    run_ai_filter(
+        text,
+        excluded,
+        issues,
+        cfg,
+        content_type,
+        boundary_index.as_ref(),
+        guards,
+    );
+
+    // The spans judged as mentions are handed back: the phrase-density signal
+    // reads the text directly, so without them the score would still count a
+    // phrase whose findings were just suppressed.
+    let mentions = drop_mentioned_style_findings(text, issues);
 
     // Syntactic translationese detectors (G1-G8, Y1-Y2, S3, V7, V13).
     if cfg.translationese_detection {
@@ -1618,6 +1637,321 @@ fn run_structural_passes(
         // need no boundary index.
         grammar::scan_translationese_lexical(text, excluded, issues);
         dedup_translationese_phase_duplicates(issues);
+    }
+
+    mentions
+}
+
+/// Drop style findings that name a phrase rather than use it.
+///
+/// A document about writing quotes the words it is warning against, and a
+/// checklist asks whether they appear. Reporting those is noise, and fixing
+/// them is destruction: "檢查有沒有「值得注意的是」" became
+/// "檢查有沒有「」" under the delete sentinel.
+///
+/// Both reference skills carry this as a founding rule, in the same words:
+/// 被討論的詞一律放行, 那是在提及這個詞，不是在使用它.
+///
+/// Scoped to AiStyle on purpose. A quoted zh-CN term is a different question:
+/// the reader may still want to know the source wrote 視頻, so the
+/// cross-strait family keeps reporting inside quotes.
+///
+/// The test is per line, because an unclosed quote must not silence the rest
+/// of the document, and a Markdown task-list line is covered whole: its entire
+/// point is to name the thing being looked for.
+fn drop_mentioned_style_findings(text: &str, issues: &mut Vec<Issue>) -> Vec<ByteRange> {
+    // One forward sweep rather than a lookup per issue. Finding the line by
+    // scanning back from each offset, then counting quote marks before it, is
+    // quadratic in line length: a 1.5 MB document written as one paragraph,
+    // which unwrapped Chinese prose routinely is, took 50 seconds on an
+    // ordinary lint. This walks the text once and answers every issue on a line
+    // from counters carried along it.
+    let mut by_offset: Vec<usize> = (0..issues.len())
+        .filter(|&i| is_mention_candidate(&issues[i]))
+        .collect();
+    if by_offset.is_empty() {
+        return Vec::new();
+    }
+
+    // Issues arrive in offset order for the lexical passes, but nothing
+    // guarantees it across passes, so sort the candidate view rather than
+    // assume.
+    by_offset.sort_unstable_by_key(|&idx| issues[idx].offset);
+
+    let mut drop = vec![false; issues.len()];
+    let mut next = 0usize;
+    let mut line_start = 0usize;
+    for line in text.split_inclusive('\n') {
+        let line_end = line_start + line.len();
+        // Every candidate that starts on this line.
+        let first = next;
+        while next < by_offset.len() && issues[by_offset[next]].offset < line_end {
+            next += 1;
+        }
+        if first < next {
+            if is_mention_marker_line(line) {
+                for &idx in &by_offset[first..next] {
+                    drop[idx] = true;
+                }
+            } else {
+                mark_quoted_on_line(line, line_start, &by_offset[first..next], issues, &mut drop);
+            }
+        }
+        line_start = line_end;
+        if next == by_offset.len() {
+            break;
+        }
+    }
+
+    // The spans that were mentions, in offset order, for the phrase-density
+    // signal, which reads the text rather than this list.
+    let spans: Vec<ByteRange> = by_offset
+        .iter()
+        .filter(|&&idx| drop[idx])
+        .map(|&idx| ByteRange {
+            start: issues[idx].offset,
+            end: issues[idx].offset + issues[idx].length,
+        })
+        .collect();
+
+    // "is_excluded" binary searches once past ten ranges and relies on them
+    // being disjoint, so two findings on one quoted phrase could otherwise hide
+    // a third between them. This is the builder every other producer of
+    // exclusion-shaped ranges ends in.
+    let mentions = merge_ranges_pub(spans);
+
+    // Consume the mask alongside retain's in-order visit, so no index can drift
+    // out of step with it.
+    let mut mask = drop.into_iter();
+    issues.retain(|_| !mask.next().unwrap_or(false));
+    mentions
+}
+
+/// Whether a finding could be a phrase named rather than used.
+///
+/// Only a lexical phrase match can be. A structural finding measures shape
+/// over a whole document and is merely anchored somewhere:
+/// 全文混用「你」與「您」
+/// points at the first 你, and when that one sat in a quotation the
+/// document-wide finding disappeared. An invisible character has no mention
+/// reading at all, since writing about hidden characters does not put one in
+/// the text; dropping those silenced the layer that closes the
+/// hidden-instruction channel.
+fn is_mention_candidate(issue: &Issue) -> bool {
+    issue.rule_type == IssueType::AiStyle
+        && issue.length > 0
+        && issue.structural_family.is_none()
+        && !issue
+            .found
+            .chars()
+            .all(crate::engine::ai_score::is_zero_width_candidate)
+}
+
+#[cfg(test)]
+mod mention_tests {
+    use super::*;
+
+    // Every blank-line form has to split, including the mixed ones a patch or a
+    // merge leaves behind. Matching only "\n\n" and "\r\n\r\n" let a mixed
+    // document read as one paragraph, and the paragraph-level detectors
+    // returned under their minimum count without a word.
+    #[test]
+    fn a_blank_line_splits_whatever_terminators_it_uses() {
+        for sep in ["\n\n", "\r\n\r\n", "\n\r\n", "\r\n\n"] {
+            let doc = format!("第一段。{sep}第二段。{sep}第三段。");
+            let paras = split_paragraphs(&doc);
+            assert_eq!(
+                paras.iter().map(|(_, p)| *p).collect::<Vec<_>>(),
+                ["第一段。", "第二段。", "第三段。"],
+                "separator {sep:?}"
+            );
+        }
+    }
+
+    // The phrase-density signal reads the text, not the issue list, so a
+    // document that quotes a tell had every finding suppressed and still scored
+    // for the phrase: "No issues found" beside "AI score: 0.92".
+    #[test]
+    fn a_quoted_phrase_scores_no_higher_than_its_absence() {
+        let body = "這裡示範一個常見的寫作毛病。".repeat(30);
+        let quoted = "避免使用「值得注意的是」這個詞。".repeat(8);
+        let used = "值得注意的是，這個設計很好。".repeat(8);
+
+        let score = |doc: &str| {
+            let scanner = Scanner::new(
+                crate::rules::loader::load_embedded_ruleset()
+                    .unwrap()
+                    .spelling_rules,
+                Vec::new(),
+            );
+            let mut cfg = Profile::Base.config();
+            cfg.ai_filler_detection = true;
+            cfg.ai_density_detection = true;
+            cfg.ai_structural_patterns = true;
+            cfg.ai_semantic_safety = true;
+            scanner
+                .scan_with_config(doc, &[], cfg)
+                .ai_signature
+                .map_or(0.0, |r| r.score)
+        };
+
+        let quoting = score(&format!("{body}\n\n{quoted}\n\n{body}"));
+        let using = score(&format!("{body}\n\n{used}\n\n{body}"));
+        assert!(
+            quoting < using,
+            "quoting a tell must score below using it: {quoting} vs {using}"
+        );
+    }
+}
+
+/// Whether a line labels a phrase rather than using one.
+///
+/// Two markers mean it. A task-list item names the thing being looked for, and
+/// a ❌/✅ pair marks a specimen, which is how every zh-TW writing guide
+/// vendored here shows the wrong version of a sentence. Both make the phrase a
+/// mention, so a document that teaches people to delete 值得注意的是 is not
+/// reported for containing it.
+///
+/// One predicate rather than one per marker. They were two, and the two
+/// disagreed: the specimen test peeled list and blockquote markers first, the
+/// task-list test did not, so a blockquoted checkbox reported while a
+/// blockquoted ❌ on the next line did not. Peeling once and widening the
+/// marker set makes that a data question instead of a second function.
+fn is_mention_marker_line(line: &str) -> bool {
+    let mut rest = line.trim_start();
+
+    // Peel containers, innermost last: "> - ❌ …" is still a specimen. Each
+    // pass must consume something, so this terminates.
+    loop {
+        let stripped = if let Some(after) = rest.strip_prefix('>') {
+            after
+        } else if grammar::is_bullet_item(rest) {
+            &rest[2..]
+        } else if let Some(len) = grammar::numbered_list_marker_len(rest) {
+            &rest[len..]
+        } else {
+            break;
+        };
+        rest = stripped.trim_start();
+    }
+
+    // A checkbox, or a specimen mark. Anything else is ordinary prose, and a
+    // marker used mid-sentence is being used rather than labelling.
+    matches!(rest.as_bytes(), [b'[', b' ' | b'x' | b'X', b']', ..])
+        || rest.starts_with(['\u{274C}', '\u{2705}', '\u{2713}', '\u{2717}'])
+}
+
+/// Mark which of a line's candidates sit inside a quotation.
+///
+/// One pass over the line rather than one per candidate. The old form counted
+/// quote marks in the prefix for every issue, so a line carrying thousands of
+/// findings rescanned it thousands of times.
+///
+/// Depth counting rather than pairing, so a nested 「…『…』…」 still reads as
+/// open. Straight double quotes have no distinct closer, so they go by parity.
+/// A span counts as quoted only if the quotation also closes after it, which
+/// is what keeps an unclosed quote from silencing the rest of the line.
+fn mark_quoted_on_line(
+    line: &str,
+    line_start: usize,
+    candidates: &[usize],
+    issues: &[Issue],
+    drop: &mut [bool],
+) {
+    // A span is enclosed only if a closer follows it, which is true exactly
+    // when the last closer is at or after its end. Collecting every closer to
+    // ask that would put a linear scan inside the per-character loop, which is
+    // the shape this rewrite exists to remove.
+    let last_closer = line.rfind(['」', '』']);
+    let last_ascii = line.rfind('"');
+    if last_closer.is_none() && last_ascii.is_none() {
+        return;
+    }
+
+    let mut cand = candidates.iter().peekable();
+    let mut depth = 0i32;
+    let mut ascii_open = false;
+    for (i, ch) in line.char_indices() {
+        // Answer every candidate that starts here, before this character is
+        // counted: a quote mark at the span's own start is not enclosing it.
+        while let Some(&&idx) = cand.peek() {
+            let rel = issues[idx].offset - line_start;
+            if rel != i {
+                break;
+            }
+            cand.next();
+            let end = rel + issues[idx].length;
+            drop[idx] = if depth > 0 {
+                last_closer.is_some_and(|c| c >= end)
+            } else {
+                ascii_open && last_ascii.is_some_and(|c| c >= end)
+            };
+        }
+        match ch {
+            '「' | '『' => depth += 1,
+            '」' | '』' => depth -= 1,
+            '"' => ascii_open = !ascii_open,
+            _ => {}
+        }
+        if cand.peek().is_none() {
+            return;
+        }
+    }
+}
+
+/// Run procedural AI detectors while retaining each profile switch as its own
+/// gate. Rule-backed lexical fillers stay in the lexical pass so rule packs
+/// and overrides apply. Semantic, density, and structural checks stay separate
+/// because their false-positive tradeoffs differ.
+fn run_ai_filter(
+    text: &str,
+    excluded: &[ByteRange],
+    issues: &mut Vec<Issue>,
+    cfg: &ProfileConfig,
+    content_type: ContentType,
+    boundary_index: Option<&BoundaryIndex>,
+    guards: &rule_ir::GuardRules,
+) {
+    if cfg.ai_semantic_safety {
+        grammar::scan_ai_grammar(text, excluded, issues);
+
+        // A style tell, not a grammar error, so it must neither ride along on
+        // "grammar_checks" (on by default in every profile) nor vanish with it
+        // ("--relaxed" clears it).
+        grammar::scan_ai_bare_attribution(
+            text,
+            excluded,
+            cfg.document_genre,
+            guards.get("uncited_attribution"),
+            issues,
+        );
+    }
+
+    if cfg.ai_structural_patterns {
+        grammar::scan_ai_structural(text, excluded, issues, cfg.ai_threshold_multiplier);
+    }
+
+    // Invisible characters are not a structural pattern and never were: they
+    // rode along inside that pass because that is where the call sat. The score
+    // counts them whenever any AI stage is on, so gating the findings on one
+    // stage left a caller able to see a zero-width count with no issue to fix.
+    // Same condition as the score.
+    if cfg.ai_filler_detection
+        || cfg.ai_semantic_safety
+        || cfg.ai_density_detection
+        || cfg.ai_structural_patterns
+    {
+        grammar::scan_ai_zero_width(text, excluded, issues);
+    }
+
+    if cfg.ai_density_detection {
+        grammar::scan_ai_density(text, excluded, issues, cfg.ai_threshold_multiplier);
+    }
+
+    if cfg.ai_structural_patterns {
+        if let Some(idx) = boundary_index {
+            grammar::scan_ai_structural_phase2(text, excluded, issues, idx, content_type);
+        }
     }
 }
 
@@ -1783,16 +2117,12 @@ mod tests {
         ]
     }
 
-    fn translationese_issues<'a>(issues: &'a [Issue], code: &str) -> Vec<&'a Issue> {
+    /// Select by detector family, which is now a field rather than a code
+    /// spelled into the human-readable message.
+    fn translationese_issues(issues: &[Issue], family: PhaseFamily) -> Vec<&Issue> {
         issues
             .iter()
-            .filter(|issue| {
-                issue.rule_type == IssueType::Translationese
-                    && issue
-                        .context
-                        .as_ref()
-                        .is_some_and(|context| context.contains(code))
-            })
+            .filter(|issue| issue.phase_family.is_some_and(|(f, _)| f == family))
             .collect()
     }
 
@@ -1804,6 +2134,90 @@ mod tests {
         assert_eq!(issues[0].found, "軟件");
         assert_eq!(issues[0].suggestions[..], vec!["軟體"]);
         assert_eq!(issues[0].rule_type, IssueType::CrossStrait);
+    }
+
+    #[test]
+    fn reusable_scratch_plain_api_remains_available() {
+        let scanner = Scanner::new(sample_spelling_rules(), vec![]);
+        let cfg = Profile::Base.config();
+        let mut scratch = ScratchSpace::new();
+
+        // This four-argument call is the public hot-loop API. Keep it as a
+        // compile-time compatibility test while content-aware callers use the
+        // separately named variant.
+        let legacy = scanner.scan_with_config_into("這個軟件很好用", &[], cfg, &mut scratch);
+        let mut content_scratch = ScratchSpace::new();
+        let content_aware = scanner.scan_with_config_into_content_type(
+            "這個軟件很好用",
+            &[],
+            cfg,
+            ContentType::Plain,
+            &mut content_scratch,
+        );
+
+        assert_eq!(legacy.issues.len(), 1);
+        assert_eq!(legacy.issues[0].found, "軟件");
+        assert_eq!(
+            legacy
+                .issues
+                .iter()
+                .map(|issue| (&issue.offset, &issue.found))
+                .collect::<Vec<_>>(),
+            content_aware
+                .issues
+                .iter()
+                .map(|issue| (&issue.offset, &issue.found))
+                .collect::<Vec<_>>()
+        );
+    }
+
+    // The mention filter answers "is this phrase named or used", a question an
+    // invisible character cannot be on either side of. Scoping it to every
+    // AiStyle finding silenced the invisible-character layer inside a quotation
+    // and on a task-list line, which is where a hidden-instruction payload
+    // would sit.
+    #[test]
+    fn quoting_does_not_hide_an_invisible_character() {
+        let scanner = Scanner::new(vec![], vec![]);
+        let mut cfg = Profile::Base.config();
+        cfg.ai_structural_patterns = true;
+        let text = "注意「零寬\u{200B}空格」。\n- [ ] 檢查\u{200B}殘留\n零寬\u{200B}空格在外面。\n";
+        let issues = scanner
+            .scan_for_content_type_with_config(text, ContentType::Plain, cfg)
+            .issues;
+        assert_eq!(
+            issues
+                .iter()
+                .filter(|issue| issue.found == "\u{200B}")
+                .count(),
+            3,
+            "every zero-width space must be reported: {issues:?}"
+        );
+    }
+
+    // A document-level finding is anchored on one occurrence, so scoping the
+    // mention filter to it made the whole finding hostage to that line: the
+    // same document reported the mixed address with a bare 你 and said nothing
+    // once the first 你 appeared in a quotation.
+    #[test]
+    fn quoting_one_occurrence_does_not_hide_a_document_wide_finding() {
+        let scanner = Scanner::new(vec![], vec![]);
+        let mut cfg = Profile::Base.config();
+        cfg.ai_structural_patterns = true;
+        for text in [
+            "手冊裡寫你這個字，但這裡一律用您。您可以參考說明。",
+            "手冊裡寫「你」這個字，但這裡一律用您。您可以參考說明。",
+        ] {
+            let issues = scanner
+                .scan_for_content_type_with_config(text, ContentType::Plain, cfg)
+                .issues;
+            assert!(
+                issues
+                    .iter()
+                    .any(|issue| issue.context.as_deref().is_some_and(|c| c.contains("混用"))),
+                "mixed reader address lost for {text}: {issues:?}"
+            );
+        }
     }
 
     #[test]
@@ -2719,14 +3133,13 @@ mod tests {
     fn translationese_pipeline_keeps_only_indexed_zy2_issue() {
         let scanner = Scanner::new(vec![], vec![]);
         let issues = scanner.scan("因為下雨了，所以我們待在屋裡。").issues;
-        let zy2 = translationese_issues(&issues, "ZY2");
+        let zy2 = translationese_issues(&issues, PhaseFamily::Connective);
         assert_eq!(zy2.len(), 1, "expected one surviving ZY2 issue: {issues:?}");
         assert!(
             zy2[0]
-                .context
-                .as_ref()
-                .is_some_and(|context| context.contains("ZY2b")),
-            "indexed ZY2b should win: {issues:?}"
+                .phase_family
+                .is_some_and(|(_, pass)| pass == PhasePass::Indexed),
+            "the boundary-aware half should win: {issues:?}"
         );
     }
 
@@ -2734,14 +3147,13 @@ mod tests {
     fn translationese_pipeline_keeps_only_indexed_zy3_issue() {
         let scanner = Scanner::new(vec![], vec![]);
         let issues = scanner.scan("他完成改善的提升的發現工作。").issues;
-        let zy3 = translationese_issues(&issues, "ZY3");
+        let zy3 = translationese_issues(&issues, PhaseFamily::Nominalization);
         assert_eq!(zy3.len(), 1, "expected one surviving ZY3 issue: {issues:?}");
         assert!(
             zy3[0]
-                .context
-                .as_ref()
-                .is_some_and(|context| context.contains("ZY3b")),
-            "indexed ZY3b should win: {issues:?}"
+                .phase_family
+                .is_some_and(|(_, pass)| pass == PhasePass::Indexed),
+            "the boundary-aware half should win: {issues:?}"
         );
     }
 

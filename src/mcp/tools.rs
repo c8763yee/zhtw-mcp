@@ -33,7 +33,9 @@ use crate::fixer::{
 use crate::rules::ignore::apply_ignore_set;
 use crate::rules::loader::compute_ruleset_hash;
 use crate::rules::ruleset::Ruleset;
-use crate::rules::ruleset::{Issue, IssueType, PoliticalStance, Profile, ResolutionTier, Severity};
+use crate::rules::ruleset::{
+    DocumentGenre, Issue, IssueType, PoliticalStance, Profile, ResolutionTier, Severity,
+};
 use crate::rules::store::{OverrideStore, PackStore, SuppressionStore, TranslationMemoryStore};
 
 /// What the server reads and never changes: the compiled scanner and the
@@ -156,6 +158,19 @@ impl Server {
         }
         if let Some(error) = reject_unknown_params(arguments) {
             return Err(error);
+        }
+        // Refuse before scanning rather than after. "verify" ships sentence
+        // excerpts of the caller's text to a third party, and the operator who
+        // set the variable outranks the model that asked.
+        #[cfg(feature = "translate")]
+        if parse_verify(arguments) {
+            if let Err(reason) = crate::engine::translate::refuse_if_network_disabled("\"verify\"")
+            {
+                return Err(ErrorData::invalid_params(
+                    format!("{reason}; retry without it"),
+                    Some(json!({ "field": "verify", "reason": "network_disabled" })),
+                ));
+            }
         }
         let result = self.tool_check(arguments, bridge, declared_client);
 
@@ -320,6 +335,7 @@ impl Server {
             verify,
             ref ignore_terms,
             ref translationese_domain_opt,
+            ref document_genre_opt,
             ..
         } = params;
 
@@ -370,6 +386,7 @@ impl Server {
                 detect_ai: detect_ai_opt,
                 detect_translationese: detect_translationese_opt,
                 translationese_domain: translationese_domain_opt.as_deref(),
+                document_genre: document_genre_opt.as_deref(),
                 ai_threshold,
             },
         )?;
@@ -953,6 +970,7 @@ struct CheckParams<'a> {
     /// `--detect-style` shorthand; off by default to keep the payload lean.
     detect_style: bool,
     translationese_domain_opt: Option<String>,
+    document_genre_opt: Option<String>,
     ai_threshold: Option<&'a str>,
     relaxed: bool,
     exempt_blockquotes: bool,
@@ -984,6 +1002,7 @@ impl<'a> CheckParams<'a> {
                 .get("translationese_domain")
                 .and_then(|v| v.as_str())
                 .map(str::to_string),
+            document_genre_opt: optional_str_validated(args, "document_genre")?.map(str::to_string),
             ai_threshold: optional_str_validated(args, "ai_threshold")?,
             relaxed: parse_flag(args, "relaxed"),
             exempt_blockquotes: parse_flag(args, "exempt_blockquotes"),
@@ -1262,11 +1281,20 @@ fn build_explanation(issue: &Issue) -> Option<String> {
             if let Some(ctx) = &issue.context {
                 parts.push(format!("'{}' — {}.", issue.found, ctx));
             }
-            if !issue.suggestions.is_empty() {
-                let sugg = issue.suggestions.join(" / ");
-                parts.push(format!("Suggested: {sugg}."));
-            } else {
-                parts.push("Consider removing or rephrasing.".to_string());
+            // Read the suggestions directly rather than the derived
+            // suggested_rewrite field, so a stale derivation cannot change what
+            // the reader is told.
+            match &*issue.suggestions {
+                // Advice only: the context already says what to do, and telling
+                // a reader to remove an unsourced attribution would delete the
+                // claim rather than source it.
+                [] => {}
+                [one] if !one.is_empty() => parts.push(format!("Suggested rewrite: {one}.")),
+                all if all.iter().any(|s| !s.is_empty()) => parts.push(
+                    "Rewrite the surrounding clause; do not choose an alternative mechanically."
+                        .to_string(),
+                ),
+                _ => parts.push("Consider removing or rephrasing.".to_string()),
             }
         }
         IssueType::Translationese => {
@@ -1958,6 +1986,7 @@ struct CheckFlags<'a> {
     detect_ai: Option<bool>,
     detect_translationese: Option<bool>,
     translationese_domain: Option<&'a str>,
+    document_genre: Option<&'a str>,
     ai_threshold: Option<&'a str>,
 }
 
@@ -1994,6 +2023,12 @@ fn build_check_config(
             None => {
                 return Err(enum_param_error("translationese_domain", domain_str));
             }
+        }
+    }
+    if let Some(genre_str) = flags.document_genre {
+        match DocumentGenre::from_str_strict(genre_str) {
+            Some(genre) => cfg.document_genre = genre,
+            None => return Err(enum_param_error("document_genre", genre_str)),
         }
     }
 
@@ -2768,12 +2803,17 @@ fn input_schema_properties() -> &'static JsonObject {
             }));
         props.insert("detect_style".into(), json!({
                 "type": "boolean",
-                "description": "Composite style scorecard: emit `style_scorecard` with three orthogonal axes (ai, translationese, consistency) plus top contributing issues. Default: false. Three scores never collapsed into a single number."
+                "description": "Composite style scorecard: emit `style_scorecard` with three orthogonal axes (ai, translationese, regional_density) plus top contributing issues. Default: false. Three scores never collapsed into a single number."
             }));
         props.insert("translationese_domain".into(), json!({
                 "type": "string",
                 "enum": ["general", "technical", "literary", "news"],
                 "description": "Per-domain calibration for translationese scoring thresholds. 'technical' tolerates more passive voice and weak-verb nominalization; 'literary' is the strictest; 'news' favors active voice. Default: 'general'."
+            }));
+        props.insert("document_genre".into(), json!({
+                "type": "string",
+                "enum": ["casual", "technical", "financial"],
+                "description": "Register for unsupported authority attributions. Requires detect_ai. Never suggests an edit: casual prose is advised to name the source or drop the appeal, technical and financial prose that the claim needs a citation. Default: casual."
             }));
         props.insert("ai_threshold".into(), json!({
                 "type": "string",
@@ -3216,14 +3256,28 @@ mod tests {
             IssueType::Translationese,
             Severity::Info,
         )
-        .with_context("dewesternise.V3: abstract-means calque; prefer 藉由");
+        .with_context("abstract-means calque; prefer 藉由");
         let explanation = build_explanation(&issue).expect("explanation");
         assert_eq!(
-            explanation.matches("dewesternise.V3").count(),
+            explanation.matches("abstract-means calque").count(),
             1,
             "context must appear exactly once: {explanation}"
         );
         assert!(explanation.contains("Suggested rewrite"));
+    }
+
+    #[test]
+    fn ai_style_explanation_marks_a_single_replacement_as_a_rewrite() {
+        let issue = Issue::new(
+            0,
+            "被廣泛使用".len(),
+            "被廣泛使用",
+            vec!["廣泛使用".into()],
+            IssueType::AiStyle,
+            Severity::Info,
+        );
+        let explanation = build_explanation(&issue).expect("explanation");
+        assert!(explanation.contains("Suggested rewrite: 廣泛使用"));
     }
 
     #[test]
@@ -3579,6 +3633,7 @@ mod tests {
             "fix_output",
             "output",
             "translationese_domain",
+            "document_genre",
             "ai_threshold",
         ] {
             assert!(
@@ -3633,6 +3688,7 @@ mod tests {
             "detect_translationese",
             "detect_style",
             "translationese_domain",
+            "document_genre",
             "ai_threshold",
             "include_telemetry",
             "include_stats",

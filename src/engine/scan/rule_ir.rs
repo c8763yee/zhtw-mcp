@@ -718,6 +718,112 @@ impl ProfileFilter {
         }
     }
 }
+
+/// Phrases a procedural detector owns, with the automaton to find them.
+///
+/// Built from the ruleset rather than a `const`, which is the point: these
+/// phrases now carry `disabled`, user overrides and the provenance gate like
+/// every other rule, while the detector keeps the structural guard the schema
+/// cannot express.
+pub struct StructuralGuard {
+    phrases: Vec<String>,
+    ac: AhoCorasick,
+}
+
+impl StructuralGuard {
+    /// Build a guard straight from phrases, for tests that exercise the
+    /// detector without going through a ruleset.
+    #[cfg(test)]
+    pub fn from_phrases(phrases: Vec<String>) -> Self {
+        let ac = AhoCorasickBuilder::new()
+            .match_kind(MatchKind::LeftmostLongest)
+            .build(&phrases)
+            .expect("test guard patterns are valid");
+        Self { phrases, ac }
+    }
+
+    /// The phrase behind a match, by pattern index.
+    pub fn phrase(&self, index: usize) -> &str {
+        &self.phrases[index]
+    }
+
+    /// Non-overlapping leftmost-longest matches over `text`.
+    pub fn find_iter<'a>(
+        &'a self,
+        text: &'a str,
+    ) -> impl Iterator<Item = aho_corasick::Match> + 'a {
+        self.ac.find_iter(text)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.phrases.is_empty()
+    }
+}
+
+/// Every structural guard that has at least one live phrase.
+#[derive(Default)]
+pub struct GuardRules {
+    guards: FxHashMap<String, StructuralGuard>,
+}
+
+impl GuardRules {
+    /// Collect guarded phrases from the full rule set.
+    ///
+    /// Takes the rules before profile filtering, like the segmenter does: a
+    /// profile that drops `ai_filler` from the lexical automaton must not also
+    /// silently empty a detector that has its own gate.
+    pub fn build(rules: &[SpellingRule]) -> Self {
+        // Same order as prepare_rules: drop disabled, then last-wins by `from`.
+        // Both sides have to agree on which duplicate survives, or a phrase
+        // could be dropped from the lexical automaton by one rule and picked up
+        // here by another, or by neither.
+        let mut winner: FxHashMap<&str, &SpellingRule> = FxHashMap::default();
+        for rule in rules.iter().filter(|r| !r.disabled) {
+            winner.insert(rule.from.as_str(), rule);
+        }
+
+        let mut by_guard: FxHashMap<String, Vec<String>> = FxHashMap::default();
+        for rule in winner.into_values() {
+            let Some(guard) = rule.structural_guard.as_deref() else {
+                continue;
+            };
+
+            // An unknown name means the ruleset asked for a detector this build
+            // does not have. Dropping the phrase silently would turn a typo
+            // into missing coverage, so leave it out of the lexical pass (that
+            // already happened) and out of here, and let the ruleset linter be
+            // the thing that reports it.
+            if !crate::rules::ruleset::KNOWN_STRUCTURAL_GUARDS.contains(&guard) {
+                tracing::warn!(guard, phrase = %rule.from, "unknown structural_guard, rule inert");
+                continue;
+            }
+            by_guard
+                .entry(guard.to_string())
+                .or_default()
+                .push(rule.from.clone());
+        }
+        let guards = by_guard
+            .into_iter()
+            .filter_map(|(name, mut phrases)| {
+                // Sorted so the automaton, and therefore pattern indices and
+                // match order, do not depend on hash-map iteration order.
+                phrases.sort();
+                let ac = AhoCorasickBuilder::new()
+                    .match_kind(MatchKind::LeftmostLongest)
+                    .build(&phrases)
+                    .ok()?;
+                Some((name, StructuralGuard { phrases, ac }))
+            })
+            .collect();
+        Self { guards }
+    }
+
+    /// The guard registered under `name`, if any phrase still carries it.
+    pub fn get(&self, name: &str) -> Option<&StructuralGuard> {
+        self.guards.get(name)
+    }
+}
+
 /// Reduce the incoming rules to the set that will actually be compiled.
 ///
 /// Order matters and is load-bearing: disabled rules go first, then dedup by
@@ -749,6 +855,17 @@ fn prepare_rules(spelling_rules: Vec<SpellingRule>, filter: &ProfileFilter) -> V
             k
         });
     }
+
+    // A guarded rule is owned by a procedural detector, so drop it from the
+    // lexical automaton: left in, the phrase would be reported with none of the
+    // structural checks the guard exists to run.
+    //
+    // After dedup, for the same reason profile filtering is. An override that
+    // redefines a phrase without a guard, or adds one to a phrase that had
+    // none, only settles once last-wins has picked the surviving rule.
+    // Filtering first would decide the question against a rule the ruleset had
+    // already replaced.
+    spelling_rules.retain(|r| r.structural_guard.is_none());
 
     // Profile-aware filtering: exclude rule types that the target profile would
     // always fast-reject. Runs after dedup to preserve last-wins semantics.

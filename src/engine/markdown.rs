@@ -50,6 +50,56 @@ pub fn build_markdown_excluded_ranges(text: &str) -> Vec<ByteRange> {
     build_markdown_excluded_ranges_with_options(text, MdScanOptions::default())
 }
 
+/// Return line starts for Markdown blocks that end the section before them.
+///
+/// Only headings and thematic breaks qualify. Those are the constructs that
+/// actually close a section; a list, blockquote, or code fence sits *inside*
+/// one, and the sentence before it is the lead-in that introduces it, which is
+/// the standard shape of technical zh-TW. Treating those as boundaries turned
+/// every "…，如下所示。" before a fence into a formulaic closer.
+///
+/// The value of asking the parser rather than matching a line prefix is that
+/// it knows a heading-shaped line inside a fence is not a heading, and that a
+/// setext underline makes the line above it one. Parser event ranges can start
+/// after indentation, so normalize each range to its physical source-line
+/// start before handing it to the line-oriented scanner.
+pub(crate) fn block_boundary_starts(text: &str) -> Vec<usize> {
+    // YAML frontmatter is metadata, not a section. The parser has no notion of
+    // it: the opening fence reads as a thematic break and the closing one turns
+    // the last key line into a setext heading, so both would land here as
+    // boundaries. Nothing can precede the first of them, which makes this
+    // unreachable for the closer detector today, but the list is supposed to
+    // hold blocks that end a section and neither of these does.
+    let frontmatter_end = detect_frontmatter(text).unwrap_or(0);
+    let opts = Options::ENABLE_TABLES | Options::ENABLE_STRIKETHROUGH;
+
+    // Depth tracks container nesting. A heading or a break inside a quote or a
+    // list item belongs to that container, not to the document: "> # 標題" does
+    // not end the section the quote sits in, and counting it flagged the
+    // sentence above the quote as a formulaic closer.
+    let mut depth = 0usize;
+    let mut starts = Vec::new();
+    for (event, range) in Parser::new_ext(text, opts).into_offset_iter() {
+        match event {
+            // Item is not counted: it only ever occurs inside a List, which has
+            // already made the depth non-zero.
+            Event::Start(Tag::BlockQuote(_) | Tag::List(_)) => depth += 1,
+            Event::End(TagEnd::BlockQuote(_) | TagEnd::List(_)) => {
+                depth = depth.saturating_sub(1);
+            }
+            Event::Rule | Event::Start(Tag::Heading { .. })
+                if depth == 0 && range.start >= frontmatter_end =>
+            {
+                starts.push(text[..range.start].rfind(['\n', '\r']).map_or(0, |i| i + 1));
+            }
+            _ => {}
+        }
+    }
+    starts.sort_unstable();
+    starts.dedup();
+    starts
+}
+
 /// Like [build_markdown_excluded_ranges], but fenced/indented code blocks are
 /// NOT excluded.  Only inline code (`backtick`), HTML, and YAML frontmatter
 /// are excluded.  This allows linting Chinese prose inside code blocks
@@ -432,6 +482,69 @@ fn detect_frontmatter(text: &str) -> Option<usize> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn block_boundaries_are_normalized_to_source_line_starts() {
+        let md = "前言。\n\n   # 標題\n\n  - 項目\n\n > 引文\n\n```sh\necho ok\n```\n\n---\n";
+        let starts = block_boundary_starts(md);
+        for line in ["   # 標題", "---"] {
+            let start = md.find(line).unwrap();
+            assert!(
+                starts.binary_search(&start).is_ok(),
+                "missing {line:?}: {starts:?}"
+            );
+        }
+
+        // A list, blockquote, or fence opens a block inside the section, not a
+        // new section. The sentence before it is a lead-in, not a closer.
+        for line in ["  - 項目", " > 引文", "```sh"] {
+            let start = md.find(line).unwrap();
+            assert!(
+                starts.binary_search(&start).is_err(),
+                "{line:?} must not end a section: {starts:?}"
+            );
+        }
+        assert!(starts.binary_search(&0).is_err());
+    }
+
+    #[test]
+    fn nested_headings_and_rules_are_not_section_boundaries() {
+        for md in [
+            "本節總結。展望未來。\n\n> # 引用裡的標題\n",
+            "本節總結。展望未來。\n\n> ---\n",
+            "本節總結。展望未來。\n\n- 項目\n\n  # 清單裡的標題\n",
+        ] {
+            let starts = block_boundary_starts(md);
+            assert!(
+                starts.is_empty(),
+                "nested construct opened a section: {md:?} -> {starts:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn frontmatter_is_not_a_section_boundary() {
+        let md = "---\ntitle: t\n---\n\n本節總結。展望未來。\n\n# 下一節\n";
+        let starts = block_boundary_starts(md);
+        let heading = md.find("# 下一節").unwrap();
+        assert_eq!(
+            starts,
+            vec![heading],
+            "only the real heading closes a section: {starts:?}"
+        );
+    }
+
+    #[test]
+    fn a_heading_shaped_line_inside_a_fence_is_not_a_boundary() {
+        // The reason this index comes from the parser rather than a line prefix
+        // test.
+        let md = "前言。\n\n```sh\n# install\nmake\n```\n";
+        let starts = block_boundary_starts(md);
+        assert!(
+            starts.is_empty(),
+            "a comment inside a fence opened a section: {starts:?}"
+        );
+    }
 
     #[test]
     fn fenced_code_block_excluded() {

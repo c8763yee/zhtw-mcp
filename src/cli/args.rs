@@ -61,6 +61,7 @@ pub(crate) struct LintArgs {
     /// which also flips detect_ai and detect_translationese.
     pub(crate) detect_style: bool,
     pub(crate) translationese_domain: zhtw_mcp::engine::translationese_score::TranslationeseDomain,
+    pub(crate) document_genre: zhtw_mcp::rules::ruleset::DocumentGenre,
     pub(crate) ai_threshold_multiplier: f32,
     pub(crate) baseline_path: Option<PathBuf>,
     pub(crate) update_baseline: bool,
@@ -91,6 +92,7 @@ impl Default for LintArgs {
             detect_style: false,
             translationese_domain:
                 zhtw_mcp::engine::translationese_score::TranslationeseDomain::General,
+            document_genre: zhtw_mcp::rules::ruleset::DocumentGenre::Casual,
             ai_threshold_multiplier: 1.0,
             baseline_path: None,
             update_baseline: false,
@@ -404,6 +406,16 @@ fn parse_lint(rest: &[String]) -> Result<(LintArgs, usize)> {
                         "unknown --translationese-domain value '{next}' (expected: general|technical|literary|news)"
                     )
                 })?;
+                i += 1;
+            }
+            "--document-genre" => {
+                let next = rest
+                    .get(i + 1)
+                    .context("--document-genre requires a value (casual|technical|financial)")?;
+                lint.document_genre = zhtw_mcp::rules::ruleset::DocumentGenre::from_str_strict(next)
+                    .with_context(|| format!(
+                        "unknown --document-genre value '{next}' (expected: casual|technical|financial)"
+                    ))?;
                 i += 1;
             }
             "--detect-style" => {
@@ -825,6 +837,18 @@ mod tests {
                 .contains("unknown --translationese-domain")
         );
         assert!(err_of(&["lint", "--translationese-domain"]).contains("requires a value"));
+    }
+
+    #[test]
+    fn document_genre_is_validated() {
+        let lint = lint_of(&["lint", "a.md", "--document-genre", "financial"]);
+        assert!(matches!(
+            lint.document_genre,
+            zhtw_mcp::rules::ruleset::DocumentGenre::Financial
+        ));
+        assert!(
+            err_of(&["lint", "--document-genre", "poetic"]).contains("unknown --document-genre")
+        );
     }
 
     #[test]

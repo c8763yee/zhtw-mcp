@@ -10,7 +10,8 @@
 use serde::{Deserialize, Serialize};
 
 use crate::engine::excluded::{is_excluded, ByteRange};
-use crate::rules::ruleset::{Issue, IssueType};
+use crate::engine::scan::is_cjk_ideograph;
+use crate::rules::ruleset::{Issue, IssueType, StructuralFamily};
 
 // Density thresholds: (phrase, human_baseline, threshold, weight).
 // Weight controls contribution to the composite score.
@@ -40,7 +41,13 @@ pub struct AiMarker {
 /// Aggregated AI writing signature report.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AiSignatureReport {
-    /// Composite score: 0.0 = clearly human, 1.0 = strongly AI-generated.
+    /// Composite density of the tracked signals, 0.0 to 1.0.
+    ///
+    /// Not an authorship verdict. It measures phrase density and rhythm
+    /// uniformity, both of which a careful writer or an over-edited corporate
+    /// document produces without any model involved. "top_signals" carries the
+    /// evidence, and the evidence is the point: read this as a diagnosis of
+    /// what the prose does, not as a claim about who wrote it.
     pub score: f32,
     /// Individual signals that contributed to the score.
     pub markers: Vec<AiMarker>,
@@ -60,19 +67,292 @@ pub struct AiSignatureReport {
 // Terminal punctuation marks that delimit Chinese sentences.
 const SENTENCE_TERMINATORS: &[char] = &['。', '！', '？', '!', '?'];
 
-// Zero-width codepoints injected by LLM tokenizers (BPE/WordPiece).
-const ZERO_WIDTH_CODEPOINTS: &[char] = &[
-    '\u{200B}', // zero-width space
-    '\u{200C}', // zero-width non-joiner
-    '\u{200D}', // zero-width joiner
-    '\u{FEFF}', // byte-order mark (mid-text = artifact)
-    '\u{200E}', // left-to-right mark
-    '\u{200F}', // right-to-left mark
-];
+/// Whether a code point can legally participate in an emoji ZWJ sequence.
+/// Kept deliberately small and range-based: this is a guard against deleting
+/// a valid family/profession emoji, not an attempt to classify every emoji.
+///
+/// Digits, "#" and "*" are deliberately absent even though they are emoji
+/// bases. They are keycap bases, and a keycap is "base FE0F 20E3" with no
+/// joiner anywhere, so admitting them buys no valid sequence and lets real
+/// residue through: "2<ZWJ>024" would read as an emoji rather than as the
+/// tokenizer artifact it is.
+fn is_emoji_base(ch: char) -> bool {
+    // Sub-blocks rather than the whole plane. 1F100 to 1F1E5 is enclosed
+    // alphanumerics, 1F700 to 1F8FF is alchemical and geometric extensions,
+    // and 1FA00 to 1FA6F is chess: none of them appear in emoji joiner
+    // sequences, so accepting them would read a stray joiner between two such
+    // symbols as a valid glyph.
+    matches!(ch as u32,
+        0x1F000..=0x1F0FF          // mahjong and playing cards
+            | 0x1F1E6..=0x1F1FF    // regional indicators
+            | 0x1F300..=0x1F6FF    // pictographs, faces, transport
+            | 0x1F900..=0x1F9FF    // supplemental pictographs
+            | 0x1FA70..=0x1FAFF    // extended-A pictographs
+            | 0x2600..=0x27BF      // misc symbols and dingbats
+            | 0x2B00..=0x2BFF      // stars and geometric shapes
+            | 0x00A9 | 0x00AE | 0x2122 | 0x2139 | 0x24C2)
+}
 
-/// Returns true if the character is a zero-width tokenizer artifact.
-pub fn is_zero_width(ch: char) -> bool {
-    ZERO_WIDTH_CODEPOINTS.contains(&ch)
+/// Viramas, the dead-consonant sign that Indic conjuncts place before a joiner.
+///
+/// Canonical combining class 9 is the Unicode definition, and
+/// "unicode-normalization" is already linked for NFC, so this recognises every
+/// virama rather than the ten a hand-written list happened to name. Which ones
+/// reach it is decided by "joining_script": only U+0900 to U+0DFF, so the two
+/// Malayalam forms qualify while Khmer coeng, Myanmar and Tibetan do not.
+fn is_virama(ch: char) -> bool {
+    unicode_normalization::char::canonical_combining_class(ch) == 9
+}
+
+/// Skin-tone modifiers. Valid directly after a base, never after a joiner:
+/// "👩🏻‍🚀" is well formed and "👩‍🏻" is not, so a modifier on the right of a
+/// joiner is residue.
+fn is_emoji_modifier(ch: char) -> bool {
+    matches!(ch as u32, 0x1F3FB..=0x1F3FF)
+}
+
+/// Script families that use a joiner orthographically. They use it
+/// differently, and the difference decides what counts as residue.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum JoiningScript {
+    /// Arabic, Persian and Urdu, where a joiner sits between two letters.
+    Arabic,
+    /// Devanagari through Sinhala, where it follows a virama. The payload is
+    /// the block index, so two different Indic scripts do not match.
+    Indic(u32),
+}
+
+fn joining_script(ch: char) -> Option<JoiningScript> {
+    match ch as u32 {
+        // Arabic Presentation Forms-B stops at FEFE: FEFF is the byte-order
+        // mark, which another arm already owns.
+        0x0600..=0x06FF | 0x0750..=0x077F | 0x08A0..=0x08FF | 0xFB50..=0xFDFF | 0xFE70..=0xFEFE => {
+            Some(JoiningScript::Arabic)
+        }
+        // One variant per 128-point block, so Devanagari and Bengali are not
+        // treated as the same script by a joiner that must not cross scripts.
+        cp @ 0x0900..=0x0DFF => Some(JoiningScript::Indic((cp - 0x0900) / 0x80)),
+        _ => None,
+    }
+}
+
+/// Whether a joiner sits inside an Indic conjunct: a virama on the left and a
+/// letter of the same script on the right. Shared by both joiners, which use
+/// the identical form, while the Arabic rule below applies only to the
+/// non-joiner.
+fn indic_conjunct(prev: Option<char>, next: Option<char>) -> bool {
+    let (Some(prev), Some(next)) = (prev, next) else {
+        return false;
+    };
+    matches!(
+        (joining_script(prev), joining_script(next)),
+        (Some(JoiningScript::Indic(a)), Some(JoiningScript::Indic(b))) if a == b
+    ) && is_virama(prev)
+        && next.is_alphabetic()
+}
+
+/// Whether a zero-width non-joiner between these two neighbours is spelling.
+///
+/// Both sides must belong to the same script family, or a joiner between an
+/// Arabic letter and a Devanagari one would excuse itself. Arabic wants two
+/// letters; Indic wants a virama on the left, since that is the conjunct form
+/// and a joiner between two bare Indic letters is not.
+fn zwnj_is_orthographic(prev: Option<char>, next: Option<char>) -> bool {
+    let (Some(prev), Some(next)) = (prev, next) else {
+        return false;
+    };
+    match (joining_script(prev), joining_script(next)) {
+        (Some(JoiningScript::Arabic), Some(JoiningScript::Arabic)) => {
+            prev.is_alphabetic() && next.is_alphabetic()
+        }
+        (Some(JoiningScript::Indic(_)), Some(JoiningScript::Indic(_))) => {
+            indic_conjunct(Some(prev), Some(next))
+        }
+        _ => false,
+    }
+}
+
+/// Whether the text holds any of the code points "is_suspicious_zero_width_at"
+/// can report. Every other code point falls through its catch-all arm, so a
+/// document without one cannot produce a hit and the caller can skip building
+/// the "Vec<char>" that the neighbour tests need.
+///
+/// One decoding pass rather than a memchr per code point. With six candidates
+/// the memchr form measured 1.13ms against 1.97ms over 1.9 MB, but the set is
+/// now ranges rather than a short list, and keeping a separate prefilter set in
+/// sync with the classifier is how the two come to disagree.
+pub(crate) fn has_zero_width(text: &str) -> bool {
+    text.chars().any(is_zero_width_candidate)
+}
+
+/// Whether "is_suspicious_zero_width_at" could possibly report this code point.
+/// Every other one falls through its catch-all arm, so testing this first keeps
+/// the neighbour analysis off the 99.99% of characters that are ordinary prose.
+///
+/// The private use areas are deliberately absent. Icon fonts put glyphs there,
+/// and the technical documents this linter reads carry them legitimately.
+pub(crate) fn is_zero_width_candidate(ch: char) -> bool {
+    matches!(ch,
+        '\u{00AD}'                    // soft hyphen
+        | '\u{034F}'                  // combining grapheme joiner
+        | '\u{180E}'                  // Mongolian vowel separator
+        | '\u{200B}'..='\u{200F}'     // ZWSP, ZWNJ, ZWJ, LRM, RLM
+        | '\u{202A}'..='\u{202E}'     // bidi embedding and override
+        | '\u{2060}'..='\u{2064}'     // word joiner, invisible math operators
+        | '\u{FDD0}'..='\u{FDEF}'     // noncharacters
+        | '\u{FEFF}'                  // byte-order mark
+        | '\u{FFF9}'..='\u{FFFB}'     // interlinear annotation
+        | '\u{E0020}'..='\u{E007F}'   // tag characters
+        | '\u{E0100}'..='\u{E01EF}'   // variation selectors supplement
+    ) || u32::from(ch) & 0xFFFE == 0xFFFE // plane-final noncharacters
+}
+
+/// Human-readable name for a candidate, used in the issue context. Families
+/// that span a range share one label; the code point number carries the rest.
+fn zero_width_label(ch: char) -> &'static str {
+    match ch {
+        '\u{00AD}' => "soft hyphen",
+        '\u{034F}' => "combining grapheme joiner",
+        '\u{180E}' => "Mongolian vowel separator",
+        '\u{200B}' => "zero-width space",
+        '\u{200C}' => "zero-width non-joiner",
+        '\u{200D}' => "zero-width joiner",
+        '\u{200E}' => "left-to-right mark",
+        '\u{200F}' => "right-to-left mark",
+        '\u{202A}'..='\u{202E}' => "bidi embedding or override",
+        '\u{2060}' => "word joiner",
+        '\u{2061}'..='\u{2064}' => "invisible math operator",
+        '\u{FEFF}' => "byte-order mark",
+        '\u{FFF9}'..='\u{FFFB}' => "interlinear annotation",
+        '\u{E0020}'..='\u{E007F}' => "tag character",
+        '\u{E0100}'..='\u{E01EF}' => "variation selector",
+        _ => "noncharacter",
+    }
+}
+
+/// Render a candidate as "U+XXXX name" for the issue context.
+pub(crate) fn describe_zero_width(ch: char) -> String {
+    format!("U+{:04X} {}", u32::from(ch), zero_width_label(ch))
+}
+
+/// The tag payloads that spell a flag.
+///
+/// UTS #51 builds an emoji tag sequence from U+1F3F4, a tag_spec and the
+/// U+E007F terminator, and every sequence in the recommended set is one of
+/// these three. Matching the payload rather than merely bounding its length is
+/// what closes the channel: a black flag, any six tag characters and a
+/// terminator otherwise passed as a flag and carried six hidden characters.
+///
+/// A closed list dates, but the trade is the right way round. A subdivision
+/// flag added to a future Unicode release is reported until this list grows,
+/// which costs one line; the alternative leaves a smuggling channel open for
+/// every document.
+const FLAG_TAG_SPECS: [&str; 3] = ["gbeng", "gbsct", "gbwls"];
+
+/// Longest payload in the list above. Both walks stop there, which is what
+/// keeps them from being quadratic: without a bound, a run of 200k tag
+/// characters took 59 seconds on 781 KB against 40 ms for 1.9 MB of ordinary
+/// prose, because every character in the run rescanned the whole run.
+///
+/// Derived, so adding a longer spec above cannot leave the bound behind and
+/// silently stop matching it.
+const MAX_FLAG_TAG_SPEC: usize = {
+    let (mut max, mut i) = (0, 0);
+    while i < FLAG_TAG_SPECS.len() {
+        if FLAG_TAG_SPECS[i].len() > max {
+            max = FLAG_TAG_SPECS[i].len();
+        }
+        i += 1;
+    }
+    max
+};
+
+/// A regional-indicator flag written as a tag sequence opens with U+1F3F4 and
+/// closes with U+E007F, and every tag character between the two belongs to it.
+/// Both ends are checked: walking left to the base alone excuses an
+/// unterminated run, which is exactly the shape hidden instructions take.
+fn inside_flag_tag_sequence(chars: &[char], index: usize) -> bool {
+    let is_spec = |c: char| ('\u{E0020}'..='\u{E007E}').contains(&c);
+    // Find the base first, then judge the whole sequence from there. Testing
+    // the payload from "index" forward instead would excuse the tail of an
+    // over-long run, because from far enough in, what remains fits the bound.
+    let back = chars[..index]
+        .iter()
+        .rev()
+        .take(MAX_FLAG_TAG_SPEC)
+        .take_while(|&&c| is_spec(c))
+        .count();
+    let Some(base) = index.checked_sub(back + 1) else {
+        return false;
+    };
+    if chars[base] != '\u{1F3F4}' {
+        return false;
+    }
+    let payload: String = chars[base + 1..]
+        .iter()
+        .take(MAX_FLAG_TAG_SPEC)
+        .take_while(|&&c| is_spec(c))
+        // Tag characters mirror ASCII 0x20 to 0x7E at U+E0020.
+        .filter_map(|&c| char::from_u32(u32::from(c) - 0xE0000))
+        .collect();
+    FLAG_TAG_SPECS.contains(&payload.as_str())
+        && chars.get(base + 1 + payload.chars().count()) == Some(&'\u{E007F}')
+}
+
+/// A text-style/emoji-style selector can sit between an emoji base and its
+/// joiner (for example in "👩‍❤️‍👩"). It changes presentation, not the identity
+/// of the preceding emoji, so skip it when validating a ZWJ's left side.
+fn emoji_base_before(chars: &[char], index: usize) -> Option<char> {
+    let mut i = index.checked_sub(1)?;
+    if matches!(chars[i], '\u{FE0E}' | '\u{FE0F}') {
+        i = i.checked_sub(1)?;
+    }
+    chars.get(i).copied()
+}
+
+/// Return whether "chars[index]" is suspicious invisible text rather than a
+/// valid formatting sequence.  The reference Unicode guard distinguishes
+/// encoding hygiene from style: a ZWJ joining two emoji and directional marks
+/// in bidirectional text are legitimate, while a stray ZWJ or mid-text BOM is
+/// useful evidence of copy/paste or tokenizer residue.
+pub fn is_suspicious_zero_width_at(chars: &[char], index: usize) -> bool {
+    let Some(&ch) = chars.get(index) else {
+        return false;
+    };
+    let prev = index.checked_sub(1).and_then(|i| chars.get(i)).copied();
+    let next = chars.get(index + 1).copied();
+    match ch {
+        '\u{200B}' => true,
+        // ZWNJ is orthography in Persian, Urdu and the Indic scripts, by the
+        // same argument that exempts LRM/RLM below. Elsewhere it is residue.
+        '\u{200C}' => !zwnj_is_orthographic(prev, next),
+        '\u{FEFF}' => index != 0, // A file-start BOM is an encoding marker.
+        '\u{200D}' => {
+            let indic = indic_conjunct(prev, next);
+            // A modifier belongs directly on a base, so it is never what a
+            // joiner introduces, though it may be what precedes one.
+            let emoji = !next.is_some_and(is_emoji_modifier)
+                && emoji_base_before(chars, index).is_some_and(is_emoji_base)
+                && next.is_some_and(is_emoji_base);
+            !(indic || emoji)
+        }
+        // LRM/RLM are required for some mixed-direction text. Do not turn
+        // their mere presence into an AI signal or a rewrite instruction.
+        '\u{200E}' | '\u{200F}' => false,
+        // A tag character is orthographic only inside a flag sequence. Loose
+        // ones are the payload of the hidden-instruction trick.
+        '\u{E0020}'..='\u{E007F}' => !inside_flag_tag_sequence(chars, index),
+        // The supplement encodes ideographic variants, so it is orthographic
+        // on a CJK base and residue anywhere else. The shared predicate also
+        // admits bopomofo, which is not a valid variation base, so a selector
+        // after one is excused. One predicate for "is this Han" beats a second
+        // spelling of it that disagrees, and the miss needs a bopomofo letter
+        // and a stray selector in the same document.
+        '\u{E0100}'..='\u{E01EF}' => !prev.is_some_and(is_cjk_ideograph),
+        // Soft hyphen, CGJ, word joiner, invisible operators, bidi overrides,
+        // interlinear annotation and noncharacters have no role in zh-TW prose.
+        _ => is_zero_width_candidate(ch),
+    }
 }
 
 // Punctuation types tracked in the density matrix.
@@ -224,11 +504,16 @@ fn compute_sentence_variability(text: &str, excluded: &[ByteRange]) -> Option<f3
 
 /// Count zero-width tokenizer artifact codepoints in text (excluding exclusion zones).
 fn count_zero_width(text: &str, excluded: &[ByteRange]) -> usize {
+    if !has_zero_width(text) {
+        return 0;
+    }
     let mut count = 0;
     let mut byte_offset = 0;
-    for ch in text.chars() {
+    let chars: Vec<char> = text.chars().collect();
+    for (index, ch) in chars.iter().copied().enumerate() {
         let ch_len = ch.len_utf8();
-        if ZERO_WIDTH_CODEPOINTS.contains(&ch)
+        if is_zero_width_candidate(ch)
+            && is_suspicious_zero_width_at(&chars, index)
             && !is_excluded(byte_offset, byte_offset + ch_len, excluded)
         {
             count += 1;
@@ -240,19 +525,22 @@ fn count_zero_width(text: &str, excluded: &[ByteRange]) -> usize {
 
 /// Compute AI signature report from text and post-scan issues.
 ///
-/// Combines six signal sources:
+/// Combines five signal sources:
 /// 1. Phrase density: count tracked phrases, compute density per 1000 chars.
 /// 2. Structural patterns: count AiStyle issues from structural detectors.
 /// 3. Per-occurrence: count non-structural/non-token AiStyle issues.
-/// 4. Sentence length variability: low stddev = AI monotony.
-/// 5. Zero-width tokenizer artifacts: BPE/WordPiece residue.
-/// 6. Punctuation density matrix: aggregate CV of inter-punctuation distances.
+/// 4. Zero-width tokenizer artifacts: BPE/WordPiece residue.
+/// 5. Punctuation density matrix: aggregate CV of inter-punctuation distances.
+///
+/// Sentence length variability is measured and serialized alongside these,
+/// but contributes nothing to the score: see the note at its call site.
 ///
 /// Returns None for texts too short to analyze (< 500 chars).
 pub fn compute_ai_score(
     text: &str,
     issues: &[Issue],
     excluded: &[ByteRange],
+    mentions: &[ByteRange],
     threshold_multiplier: f32,
 ) -> Option<AiSignatureReport> {
     // Guard against zero/negative multiplier to prevent div-by-zero in thresholds.
@@ -293,7 +581,14 @@ pub fn compute_ai_score(
         while let Some(pos) = text[start..].find(phrase) {
             let abs = start + pos;
             start = abs + phrase_len;
-            if !is_excluded(abs, abs + phrase_len, excluded) {
+            // "mentions" is separate from "excluded" on purpose. A quoted
+            // phrase is not being used, so it must not score; but the
+            // invisible-character signal below counts through "excluded", and
+            // widening that would let a hidden payload inside 「…」 go
+            // uncounted, which is the channel this layer exists to close.
+            if !is_excluded(abs, abs + phrase_len, excluded)
+                && !is_excluded(abs, abs + phrase_len, mentions)
+            {
                 count += 1;
             }
         }
@@ -316,19 +611,27 @@ pub fn compute_ai_score(
         total_weight += weight;
     }
 
-    // Signal 2: structural pattern count from existing issues.
-    let structural_count = issues
+    // Signal 2: how many distinct structural families fired.
+    //
+    // Occurrences were counted before, so four hits of one detector saturated
+    // the signal on their own. Over 278 human zh-TW documents that pinned 53%
+    // at the cap; counting families drops it to 35%. Four hits of one rule is
+    // one signal, which is what both reference skills state: an isolated
+    // device is nothing, a cluster of different devices is the confession.
+    //
+    // Formatting is capped apart from prose. Bold runs, list shape and heading
+    // form describe the Markdown rather than the writing, and they produced
+    // 1,567 of the 2,529 structural hits in that corpus, so pooling them let
+    // layout outvote the prose it was meant to weigh.
+    let families: std::collections::BTreeSet<StructuralFamily> = issues
         .iter()
-        .filter(|i| {
-            i.rule_type == IssueType::AiStyle
-                && i.context
-                    .as_ref()
-                    .is_some_and(|c| c.starts_with("AI structural:"))
-        })
-        .count();
-    // Each structural signal contributes 0.1 to score (max 0.4 for 4 signals).
-    // Rebalanced from 0.15/0.75 per 40.11: structural should not dominate phrase density.
-    let structural_contribution = (structural_count as f32 * 0.1).min(0.4);
+        .filter_map(|i| i.structural_family)
+        .filter(|f| f.is_authorship_evidence())
+        .collect();
+    let formatting = families.iter().filter(|f| f.is_formatting()).count();
+    let prose = families.len() - formatting;
+    let structural_contribution =
+        (prose as f32 * 0.1).min(0.3) + (formatting as f32 * 0.05).min(0.15);
 
     // Signal 3: non-structural, non-zero-width AiStyle issue density.
     // Excludes issues already counted by signals 1 (density phrases),
@@ -337,10 +640,13 @@ pub fn compute_ai_score(
         .iter()
         .filter(|i| {
             i.rule_type == IssueType::AiStyle
+                // Signal 2 owns anything carrying a structural family; the
+                // invisible-character layer still identifies itself by prefix.
+                && i.structural_family.is_none()
                 && !i
                     .context
                     .as_ref()
-                    .is_some_and(|c| c.starts_with("AI structural:") || c.starts_with("AI token:"))
+                    .is_some_and(|c| c.starts_with("AI token:"))
                 && !DENSITY_SIGNALS
                     .iter()
                     .any(|&(phrase, _, _, _)| i.found == phrase)
@@ -354,16 +660,21 @@ pub fn compute_ai_score(
         0.0
     };
 
-    // Signal 4: sentence length variability (low stddev = AI monotony).
+    // Sentence length variability: measured and reported, but it contributes
+    // nothing to the score.
+    //
+    // The threshold was 5.0 characters of standard deviation, and nothing
+    // reaches it. All 158 corpus cases return None, because none has the ten
+    // sentences the measurement needs, and across 405 real zh-TW documents the
+    // minimum is 13.4, including deliberately machine-written ones. A term
+    // that has never fired is not a signal, and scoring against an
+    // unfalsifiable threshold is worse than not scoring at all.
+    //
+    // Kept as an observation because it is real, already serialized, and the
+    // number a reader can act on. Reviving it as a signal needs a coefficient
+    // of variation rather than a raw sigma, since sigma is scale-dependent,
+    // and a long-form corpus to calibrate against. We have neither.
     let sentence_variability = compute_sentence_variability(text, excluded);
-    let var_threshold = 5.0 * threshold_multiplier;
-    let variability_contribution = match sentence_variability {
-        Some(sigma) if sigma < var_threshold => {
-            // sigma below threshold is suspiciously uniform; max contribution 0.15.
-            ((var_threshold - sigma) / var_threshold * 0.15).min(0.15)
-        }
-        _ => 0.0,
-    };
 
     // Signal 5: zero-width tokenizer artifacts.
     let zero_width_count = count_zero_width(text, excluded);
@@ -405,9 +716,10 @@ pub fn compute_ai_score(
         }
     };
 
-    // Composite score: combine all six signals (rebalanced per 40.11).
-    // phrase ≤0.7, structural ≤0.4, issue ≤0.3, variability ≤0.15,
-    // zero-width ≤0.2, punctuation ≤0.1.  Max ~1.85 before clamp.
+    // Composite score: combine all five scoring signals (rebalanced per
+    // 40.11). phrase ≤0.7, structural ≤0.45 (prose ≤0.3 plus formatting
+    // ≤0.15, capped apart), issue ≤0.3, zero-width ≤0.2, punctuation ≤0.1.
+    // Max 1.75 before clamp.
     // No single signal exceeds 0.7; ≥0.8 requires ≥2 dimensions.
     let phrase_score = if total_weight > 0.0 {
         (weighted_sum / total_weight).min(1.0) * 0.7
@@ -417,7 +729,6 @@ pub fn compute_ai_score(
     let raw_score = phrase_score
         + structural_contribution
         + issue_density_contribution
-        + variability_contribution
         + zero_width_contribution
         + punct_contribution;
     let score = raw_score.min(1.0);
@@ -441,16 +752,14 @@ pub fn compute_ai_score(
             )
         })
         .collect();
-    if structural_count > 0 {
-        top_signals.push(format!("{structural_count} 個結構性 AI 特徵"));
-    }
-    if let Some(sigma) = sentence_variability {
-        if sigma < var_threshold {
-            top_signals.push(format!("句長變異低 σ={sigma:.1}（疑似 AI 均質化）"));
-        }
+    let structural_families = families.len();
+    if structural_families > 0 {
+        top_signals.push(format!("{structural_families} 類結構性 AI 特徵"));
     }
     if zero_width_count > 0 {
-        top_signals.push(format!("{zero_width_count} 個零寬字元（疑似分詞器殘留）"));
+        top_signals.push(format!(
+            "{zero_width_count} 個隱形字元（疑似分詞器或複製貼上殘留）"
+        ));
     }
     if punct_contribution > 0.0 {
         top_signals.push("標點節奏過於均勻（疑似 AI 生成）".to_string());
@@ -480,14 +789,14 @@ mod tests {
 
     #[test]
     fn short_text_returns_none() {
-        let result = compute_ai_score("短文", &[], &[], 1.0);
+        let result = compute_ai_score("短文", &[], &[], &[], 1.0);
         assert!(result.is_none());
     }
 
     #[test]
     fn clean_text_low_score() {
         let text = "台灣的半導體產業在全球市場中佔有重要地位。".repeat(30);
-        let result = compute_ai_score(&text, &[], &[], 1.0);
+        let result = compute_ai_score(&text, &[], &[], &[], 1.0);
         let report = result.unwrap();
         assert!(
             report.score <= 0.3,
@@ -522,10 +831,10 @@ mod tests {
                     IssueType::AiStyle,
                     crate::rules::ruleset::Severity::Info,
                 )
-                .with_context("AI structural: test pattern")
+                .with_structural_family(StructuralFamily::Tricolon)
             })
             .collect();
-        let result = compute_ai_score(&text, &structural_issues, &[], 1.0);
+        let result = compute_ai_score(&text, &structural_issues, &[], &[], 1.0);
         let report = result.unwrap();
         assert!(
             report.score >= 0.5,
@@ -545,7 +854,7 @@ mod tests {
             text.push_str(sentence);
             text.push('。');
         }
-        let result = compute_ai_score(&text, &[], &[], 1.0);
+        let result = compute_ai_score(&text, &[], &[], &[], 1.0);
         let report = result.unwrap();
         assert!(
             report.sentence_variability.is_some(),
@@ -572,7 +881,7 @@ mod tests {
                 text.push('。');
             }
         }
-        let result = compute_ai_score(&text, &[], &[], 1.0);
+        let result = compute_ai_score(&text, &[], &[], &[], 1.0);
         let report = result.unwrap();
         let sigma = report
             .sentence_variability
@@ -591,12 +900,178 @@ mod tests {
         text.push_str("更多文字");
         text.push('\u{FEFF}');
         text.push_str("結尾。");
-        let result = compute_ai_score(&text, &[], &[], 1.0);
+        let result = compute_ai_score(&text, &[], &[], &[], 1.0);
         let report = result.unwrap();
         assert_eq!(
             report.zero_width_count, 2,
             "should detect 2 zero-width chars"
         );
+    }
+
+    #[test]
+    fn valid_emoji_and_bidi_controls_are_not_ai_artifacts() {
+        // ZWJ is essential to the single family emoji glyph. LRM/RLM are
+        // likewise valid when a zh-TW sentence embeds RTL text.
+        let chars: Vec<char> = "👩\u{200D}👩\u{200E}עברית\u{200F}".chars().collect();
+        assert!(
+            !is_suspicious_zero_width_at(&chars, 1),
+            "emoji ZWJ must not be reported or deleted"
+        );
+        assert!(
+            !is_suspicious_zero_width_at(&chars, 3) && !is_suspicious_zero_width_at(&chars, 9),
+            "directional controls must not be treated as tokenizer residue"
+        );
+
+        let complex: Vec<char> = "👩\u{200D}❤️\u{200D}👩".chars().collect();
+        assert!(
+            !is_suspicious_zero_width_at(&complex, 1) && !is_suspicious_zero_width_at(&complex, 4),
+            "variation selectors inside an emoji ZWJ sequence must be preserved"
+        );
+    }
+
+    #[test]
+    fn flag_tags_need_a_terminator() {
+        // A complete subdivision code: the payload is checked as well as the
+        // terminator, so a two-letter stub is residue however it ends.
+        let valid: Vec<char> = "🏴\u{E0067}\u{E0062}\u{E0073}\u{E0063}\u{E0074}\u{E007F}"
+            .chars()
+            .collect();
+        assert!(valid
+            .iter()
+            .enumerate()
+            .filter(|(_, &ch)| ('\u{E0020}'..='\u{E007F}').contains(&ch))
+            .all(|(i, _)| !is_suspicious_zero_width_at(&valid, i)));
+
+        let malformed: Vec<char> = "🏴\u{E0067}hidden text".chars().collect();
+        assert!(is_suspicious_zero_width_at(&malformed, 1));
+    }
+
+    // Both walks are bounded by the longest tag payload a flag can carry, so a
+    // long run of tag characters cannot make the per-character predicate
+    // rescan the run. Unbounded, 200k of them took 59 seconds on 781 KB.
+    // A payload that is not a subdivision code is residue however well formed
+    // the sequence looks. Bounding the length alone left six characters of
+    // hidden payload behind a black flag and a terminator.
+    #[test]
+    fn only_a_real_subdivision_code_spells_a_flag() {
+        let tag = |s: &str| -> Vec<char> {
+            let mut v = vec!['\u{1F3F4}'];
+            v.extend(
+                s.chars()
+                    .map(|c| char::from_u32(u32::from(c) + 0xE0000).unwrap()),
+            );
+            v.push('\u{E007F}');
+            v
+        };
+        for spec in FLAG_TAG_SPECS {
+            let chars = tag(spec);
+            assert!(
+                (1..chars.len()).all(|i| !is_suspicious_zero_width_at(&chars, i)),
+                "{spec} is a flag"
+            );
+        }
+        // Well formed, right length, not a subdivision.
+        for payload in ["hidden", "abcde", "zzzzz", "gb"] {
+            let chars = tag(payload);
+            assert!(
+                (1..chars.len()).all(|i| is_suspicious_zero_width_at(&chars, i)),
+                "{payload:?} must not pass as a flag"
+            );
+        }
+        // Unterminated, which is the shape a hidden instruction takes.
+        let mut loose = vec!['\u{1F3F4}', '\u{E0067}'];
+        loose.extend("hidden".chars());
+        assert!(is_suspicious_zero_width_at(&loose, 1));
+    }
+
+    #[test]
+    fn digits_are_not_emoji_bases_so_residue_between_them_is_caught() {
+        // Keycaps are "base FE0F 20E3" and never use a joiner, so admitting
+        // digits as emoji bases only let real residue through.
+        let chars: Vec<char> = "2\u{200D}024".chars().collect();
+        assert!(is_suspicious_zero_width_at(&chars, 1));
+    }
+
+    #[test]
+    fn a_joiner_needs_the_right_script_and_the_right_shape() {
+        // Each of these is residue that an earlier, looser rule excused.
+        let cases: &[(&str, &[char])] = &[
+            // Indic wants a virama; two bare letters are not the conjunct form.
+            (
+                "indic without virama",
+                &['\u{0915}', '\u{200C}', '\u{0937}'],
+            ),
+            // One script per joiner: Arabic letter into Devanagari is not one.
+            ("across scripts", &['\u{0627}', '\u{200C}', '\u{0915}']),
+            // A virama joins into its own script, not into Latin.
+            (
+                "virama into latin",
+                &['\u{0915}', '\u{094D}', '\u{200D}', 'A'],
+            ),
+            // A modifier belongs on a base, never after a joiner.
+            (
+                "modifier after joiner",
+                &['\u{1F469}', '\u{200D}', '\u{1F3FB}'],
+            ),
+        ];
+        for (label, chars) in cases {
+            let idx = chars
+                .iter()
+                .position(|c| matches!(c, '\u{200C}' | '\u{200D}'))
+                .unwrap();
+            assert!(
+                is_suspicious_zero_width_at(chars, idx),
+                "{label} should be reported"
+            );
+        }
+
+        // A modifier before a joiner is well formed: "👩🏻‍🚀".
+        let astronaut: Vec<char> = "\u{1F469}\u{1F3FB}\u{200D}\u{1F680}".chars().collect();
+        assert!(!is_suspicious_zero_width_at(&astronaut, 2));
+    }
+
+    #[test]
+    fn indic_conjuncts_join_across_a_virama() {
+        // Devanagari places the joiner after the virama, which is a combining
+        // mark rather than a letter, so a letters-only test rejected both.
+        for (label, joiner) in [("ZWNJ", '\u{200C}'), ("ZWJ", '\u{200D}')] {
+            let chars: Vec<char> = ['\u{0915}', '\u{094D}', joiner, '\u{0937}'].into();
+            assert!(
+                !is_suspicious_zero_width_at(&chars, 2),
+                "{label} after a virama is spelling"
+            );
+        }
+    }
+
+    #[test]
+    fn non_emoji_pictograph_blocks_are_not_bases() {
+        // Chess symbols are not part of any emoji joiner sequence, so a joiner
+        // between two of them is residue.
+        let chars: Vec<char> = "\u{1FA00}\u{200D}\u{1FA01}".chars().collect();
+        assert!(is_suspicious_zero_width_at(&chars, 1));
+    }
+
+    #[test]
+    fn zwnj_is_orthography_in_the_scripts_that_use_it() {
+        // Persian می‌رود. Same argument that exempts LRM/RLM: this is spelling.
+        let persian: Vec<char> = "\u{0645}\u{06CC}\u{200C}\u{0631}\u{0648}\u{062F}"
+            .chars()
+            .collect();
+        assert!(
+            !is_suspicious_zero_width_at(&persian, 2),
+            "a ZWNJ between Persian letters must not be called residue"
+        );
+
+        // Between Han characters it has no orthographic job.
+        let han: Vec<char> = "中\u{200C}文".chars().collect();
+        assert!(is_suspicious_zero_width_at(&han, 1));
+    }
+
+    #[test]
+    fn stray_zwj_and_mid_text_bom_remain_suspicious() {
+        let chars: Vec<char> = "甲\u{200D}乙\u{FEFF}丙".chars().collect();
+        assert!(is_suspicious_zero_width_at(&chars, 1));
+        assert!(is_suspicious_zero_width_at(&chars, 3));
     }
 
     #[test]
@@ -608,7 +1083,7 @@ mod tests {
             start: zw_offset,
             end: zw_offset + 3,
         }];
-        let result = compute_ai_score(&text, &[], &excluded, 1.0);
+        let result = compute_ai_score(&text, &[], &excluded, &[], 1.0);
         let report = result.unwrap();
         assert_eq!(
             report.zero_width_count, 0,
@@ -628,7 +1103,7 @@ mod tests {
         for _ in 0..15 {
             text.push_str("這是句子結尾。");
         }
-        let result = compute_ai_score(&text, &[], &[], 1.0);
+        let result = compute_ai_score(&text, &[], &[], &[], 1.0);
         let report = result.unwrap();
         if let Some(ref profile) = report.punctuation_profile {
             assert!(
@@ -663,7 +1138,7 @@ mod tests {
         for _ in 0..15 {
             text.push_str("結尾句子。");
         }
-        let result = compute_ai_score(&text, &[], &[], 1.0);
+        let result = compute_ai_score(&text, &[], &[], &[], 1.0);
         let report = result.unwrap();
         if let Some(ref profile) = report.punctuation_profile {
             if let Some(cv) = profile.comma.cv {
@@ -679,7 +1154,7 @@ mod tests {
     fn punctuation_profile_sparse_no_cv() {
         // Text with very few commas — CV should be None.
         let text = "台灣的半導體產業在全球市場中佔有重要地位。".repeat(30);
-        let result = compute_ai_score(&text, &[], &[], 1.0);
+        let result = compute_ai_score(&text, &[], &[], &[], 1.0);
         let report = result.unwrap();
         if let Some(ref profile) = report.punctuation_profile {
             assert!(
@@ -700,7 +1175,7 @@ mod tests {
             start: 0,
             end: text.len(),
         }];
-        let result = compute_ai_score(&text, &[], &excluded, 1.0);
+        let result = compute_ai_score(&text, &[], &excluded, &[], 1.0);
         assert!(
             result.is_none(),
             "fully excluded text should return None (below char_count threshold)"

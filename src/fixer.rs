@@ -144,19 +144,36 @@ fn fix_verdict<'a>(
     // artifact removal (empty suggestion on invisible chars only) is safe for
     // orthographic tier: it deletes invisible junk. The found-content check
     // prevents future AiStyle rules with empty suggestions from being
-    // misclassified as orthographic. Narrower check than
-    // ai_score::is_zero_width: only ZWSP (U+200B) and mid-text BOM (U+FEFF) are
-    // pure tokenizer junk safe to strip unconditionally. ZWJ/ZWNJ/LRM/RLM have
-    // legitimate uses in bidi text and emoji sequences; the broader set in
-    // ai_score.rs is appropriate for detection/scoring but too aggressive for
-    // fixing.
-    let ai_zero_width_removal = issue.rule_type == IssueType::AiStyle
+    // misclassified as orthographic. Narrower than
+    // ai_score::is_suspicious_zero_width_at, which weighs each codepoint
+    // against its neighbors: only ZWSP (U+200B) and mid-text BOM (U+FEFF) are
+    // pure tokenizer junk safe to strip unconditionally. A ZWJ or ZWNJ that the
+    // detector judged stray is still worth a human's attention rather than an
+    // automatic deletion, since misreading its context corrupts a glyph or a
+    // spelling.
+    let deletes_invisible = issue.rule_type == IssueType::AiStyle
         && crate::rules::ruleset::is_delete_suggestion(&issue.suggestions)
         && !issue.found.is_empty()
+        && issue
+            .found
+            .chars()
+            .all(crate::engine::ai_score::is_zero_width_candidate);
+    let ai_zero_width_removal = deletes_invisible
         && issue.found.chars().all(|ch| {
             ch == '\u{200B}' || (ch == '\u{FEFF}' && issue.offset > 0) // preserve file-start BOM
         });
     let orthographic = issue.rule_type.is_orthographic() || ai_zero_width_removal;
+
+    // The narrow set is the write condition, not only the tier gate. Without
+    // this the arity test below applied the deletion at every tier from
+    // LexicalSafe up, which is where "--fix" and "convert" run, so the
+    // narrowing only ever protected the tier least likely to reach it. A
+    // word-final Malayalam chillu (ZWJ before a space), a doubled Persian ZWNJ
+    // and an ideographic variation selector all read as stray to a neighbour
+    // test, and deleting them corrupts a glyph or a spelling.
+    if deletes_invisible && !ai_zero_width_removal {
+        return Verdict::Decline;
+    }
 
     // Orthographic tier: skip all lexical issues.
     if mode == FixMode::Orthographic && !orthographic {
