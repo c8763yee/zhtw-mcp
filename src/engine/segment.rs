@@ -983,6 +983,26 @@ static GENERAL_VOCAB: &[&str] = &[
     // 分組|播送, 遮掩|碼頭.  The straddle check can only block from the left,
     // so this is where these belong rather than in per-rule exceptions.
     "不停", "馬匹", "平方", "督導", "官網", "海報", "分組", "遮掩",
+    // Words ending in 外, which abut the rules 外設/外置/外鍵. Without these
+    // 額外設定 rewrites to 額硬體周邊定 and 海外設廠 to 海硬體周邊廠. 另外 and
+    // 此外 already block the straddle from the connective list above.
+    "額外", "意外", "格外", "海外", "國外", "對外", "除外", "例外", "課外", "戶外", "室外", "郊外",
+    "中外", "局外", "場外", "分外",
+    // Words ending in 標, which abut 標清/標量/標誌著, so 達標清單 rewrote to
+    // 達標準畫質單 and 投標量 to 投純量.
+    //
+    // A blocker has to be in the trie and must not itself be a rule "from"
+    // term, because the straddle probe skips those: 目標 blocks from the list
+    // above, 指標 and 座標 block as rule "to" terms, and the rest are here.
+    "達標", "投標", "招標", "得標", "流標", "中標", "路標", "音標", "浮標", "商標", "錦標",
+    // Words ending in 此, which abut 此外: 如此外向 became 如向, 彼此外貌
+    // became 彼貌, 由此外推 became 由推. 因此 already blocks it from the
+    // connective list above, which is why that one case looked fine.
+    "如此", "彼此", "對此", "由此", "除此", "就此", "至此", "為此", "據此", "藉此", "從此", "於此",
+    "特此", "在此", "自此",
+    // Words ending in 源, which abut 源碼/源文件/源代碼. 來源文件 became
+    // 來原始檔 and 電源文件 became 電原始檔.
+    "來源", "電源", "水源", "光源", "財源", "貨源", "能源", "熱源", "震源", "音源",
 ];
 
 /// Common Chinese function words and particles used to help segmentation.

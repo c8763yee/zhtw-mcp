@@ -166,6 +166,61 @@ group also removes auto-fix at every tier.
 
 A malformed group is dropped whole, never repaired. That covers an empty `clues` list (can never select), an empty `to` list (would erase the rule default), and an empty string anywhere inside `to`. The last one matters most: filtering the empty entry out of `["改善", ""]` would leave a one-entry group, and one entry is auto-fixable, so a typo would quietly grant the write permission the author's two candidates were meant to deny. A clue that also appears in `negative_context_clues` can never select, because the negative clue vetoes the whole match first; `--lint` warns about all of these.
 
+### tags
+
+Groups a rule with the others it arrived with, so a whole family can be
+retired in one line instead of one entry per rule. Two kinds of tag share the
+namespace and the prefix says which is which:
+
+- `src:` names the reference project a rule came from: `src:humanizer` (101
+  rules), `src:dewesternise` (45), `src:deaitone` (26), `src:cuimao` (11).
+- `topic:` names subject matter: `topic:ai_terms`, `topic:business_terms`,
+  `topic:false_friends`, `topic:philosophy_terms`. These cover 13 rules from
+  two imports only, so a topic tag today is partial, not a complete facet.
+
+A tag says where a rule came from. It does not say why the rule is right;
+that is the `source` field, which names a fixture or corpus case and is
+enforced for newly added rules.
+
+An override file or a rule pack switches a family off with `disabled_tags`:
+
+```json
+{ "schema_version": 3, "disabled_tags": ["src:humanizer"] }
+```
+
+Every layer's `disabled_tags` are unioned and applied after the layers merge,
+so a pack can retire a family without knowing which layer supplied it. Both
+directions are logged: a tag that no rule carries warns rather than silently
+doing nothing, and a tag that does match logs how many rules it retired, so a
+third-party pack cannot quietly remove a family you depend on. Disabling by
+name still works and is the right tool for a single rule.
+
+Tags carry no meaning to the scanner beyond this. They do not affect
+severity, tier, or whether a fix is applied.
+
+### The shape of `to`
+
+The array's arity is what the fixer reads, so the four shapes mean four
+different things:
+
+| `to` | meaning | fixer |
+|------|---------|-------|
+| one non-empty entry | the replacement is determined | writes it |
+| several entries | a judgement call between candidates | declines at every tier |
+| exactly `[""]` | delete the matched span | writes an empty string |
+| `[]` | advice only, see `context` | declines at every tier |
+
+A rule whose replacement changes meaning rather than removing padding should
+use `[]`, not a single entry, because a single entry is applied at every
+tier including the one `convert` runs at.
+
+`[""]` carries the same warning. Deleting a span is only sound when the span
+is a detachable discourse adjunct: 「值得注意的是，X」 loses nothing, while
+deleting 寶貴的 from 「那是很寶貴的經驗」 leaves 「那是很經驗」 and deleting
+隨著 from 「隨著 AI 的快速發展」 strands the clause. A predicate, a copula, a
+head noun and a modifier that a degree adverb depends on all take `[]`, so the
+issue is reported and the author decides.
+
 ## Extending the ruleset
 
 ### Adding a spelling rule
@@ -184,7 +239,13 @@ Edit `assets/ruleset.json`:
 
 Run `scripts/check-ruleset.py --lint` to validate before opening a PR.
 
-Fields: `from` (required), `to` (required, array), `type` (required: `cross_strait` / `political_coloring` / `confusable` / `typo` / `variant`), `disabled` (optional), `context` (optional, use `@seealso` for cross-refs), `english` (optional, recommended).
+Fields: `from` (required), `to` (required, array), `type` (required: `cross_strait` / `political_coloring` / `confusable` / `typo` / `variant`), `disabled` (optional), `context` (optional, use `@seealso` for cross-refs), `english` (optional, recommended), `source` (required for new rules).
+
+`source` is the evidence for adding the rule: either a fixture path under
+`tests/fixtures/` or the id of a case in `tests/corpus/`. The linter requires it
+only for rules that are new relative to the baseline revision, so the rules
+already checked in stay as they are; a new rule without it fails
+`scripts/check-ruleset.py --lint`.
 
 ### Adding a case rule
 

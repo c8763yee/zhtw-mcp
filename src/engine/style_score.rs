@@ -1,8 +1,8 @@
 // Composite three-axis style scorecard.
 //
-// Pure aggregation: AI-likelihood, translationese density, terminology
-// consistency.  Three orthogonal scores, NEVER collapsed into a single
-// number — the consumer chooses which axis to act on.
+// Pure aggregation: AI-likelihood, translationese density, regional
+// density.  Three orthogonal scores, NEVER collapsed into a single
+// number: the consumer chooses which axis to act on.
 //
 // No new detectors, no scoring-module changes — this module reads
 // `AiSignatureReport`, `TranslationeseReport`, and the issue list, then
@@ -27,10 +27,17 @@ pub struct StyleScores {
     /// Translationese density.  Higher = more 歐化 tells.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub translationese: Option<f32>,
-    /// Terminology consistency proxy.  Higher = more cross-strait /
+    /// Density of regional vocabulary, not terminology consistency.
+    ///
+    /// It counts cross-strait and confusable findings per 1000 characters, so
+    /// a document that uses PRC forms densely enough, at least one matching
+    /// finding per 1000 characters, scores 1.0 while being perfectly
+    /// consistent, and the consistency report beside it correctly emits
+    /// nothing. Two unrelated quantities shared the name "consistency"
+    /// and landed in the same JSON object. Higher = more cross-strait /
     /// confusable issues per 1000 chars.  Capped at 1.0.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub consistency: Option<f32>,
+    pub regional_density: Option<f32>,
 }
 
 /// Top contributing issues per axis.  Limited to ≤5 per axis to keep
@@ -39,7 +46,7 @@ pub struct StyleScores {
 pub struct TopIssuesPerAxis {
     pub ai: Vec<TopIssue>,
     pub translationese: Vec<TopIssue>,
-    pub consistency: Vec<TopIssue>,
+    pub regional_density: Vec<TopIssue>,
 }
 
 /// Lightweight summary of a contributing issue (no full Issue payload).
@@ -76,7 +83,7 @@ pub struct StyleScorecard {
 
 impl StyleScorecard {
     /// Aggregate scores from existing scanner outputs.  `text_chars` is
-    /// the character count of the analyzed text — the consistency axis
+    /// the character count of the analyzed text: the regional_density axis
     /// scales by it.  `None` values indicate axes that were not computed
     /// for this run.
     pub fn build(
@@ -85,23 +92,24 @@ impl StyleScorecard {
         issues: &[Issue],
         text_chars: usize,
     ) -> Self {
-        let consistency_score = compute_consistency_score(issues, text_chars);
+        let regional_density = compute_regional_density(issues, text_chars);
         Self {
             style_scores: StyleScores {
                 ai: ai.map(|s| s.score),
                 translationese: translationese.map(|s| s.score),
-                consistency: Some(consistency_score),
+                regional_density: Some(regional_density),
             },
             top_issues_per_axis: top_issues_per_axis(issues),
         }
     }
 }
 
-/// Consistency proxy: count of `cross_strait` + `confusable` issues per
-/// 1000 chars, capped at 1.0.  Documents that mix 程式/程序 and
+/// Regional vocabulary density: count of `cross_strait` + `confusable`
+/// issues per 1000 chars, capped at 1.0.  Documents that mix 程式/程序 and
 /// 記憶體/內存 raise this axis even when individual rules are
-/// Info-severity.
-fn compute_consistency_score(issues: &[Issue], text_chars: usize) -> f32 {
+/// Info-severity.  This measures how much PRC vocabulary is present, not
+/// whether the document is self-consistent about it.
+fn compute_regional_density(issues: &[Issue], text_chars: usize) -> f32 {
     if text_chars == 0 {
         return 0.0;
     }
@@ -120,14 +128,30 @@ fn top_issues_per_axis(issues: &[Issue]) -> TopIssuesPerAxis {
     let mut out = TopIssuesPerAxis::default();
     for issue in issues {
         let bucket = match issue.rule_type {
+            // A finding that is not evidence about authorship does not belong
+            // in this axis's list, or a document scoring ai: 0.0 would cite
+            // 全文混用「你」與「您」 as what earned it. Scoped to the arm it
+            // describes, so a future finding carrying one of those families
+            // under another type is not dropped silently.
+            IssueType::AiStyle
+                if issue
+                    .structural_family
+                    .is_some_and(|f| !f.is_authorship_evidence()) =>
+            {
+                continue
+            }
             IssueType::AiStyle => &mut out.ai,
             IssueType::Translationese => &mut out.translationese,
-            IssueType::CrossStrait | IssueType::Confusable => &mut out.consistency,
+            IssueType::CrossStrait | IssueType::Confusable => &mut out.regional_density,
             _ => continue,
         };
         bucket.push(TopIssue::from_issue(issue));
     }
-    for bucket in [&mut out.ai, &mut out.translationese, &mut out.consistency] {
+    for bucket in [
+        &mut out.ai,
+        &mut out.translationese,
+        &mut out.regional_density,
+    ] {
         bucket.sort_by(|a, b| b.severity.cmp(&a.severity).then(a.line.cmp(&b.line)));
         bucket.truncate(5);
     }
@@ -155,6 +179,8 @@ mod tests {
             context_clues: None,
             anchor_match: None,
             glossary_banned: false,
+            phase_family: None,
+            structural_family: None,
             tier2_outcome: Default::default(),
             llm_judged: false,
             spelling_rule_idx: None,
@@ -164,11 +190,11 @@ mod tests {
     }
 
     #[test]
-    fn empty_inputs_zero_consistency() {
+    fn empty_inputs_zero_regional_density() {
         let card = StyleScorecard::build(None, None, &[], 0);
         assert!(card.style_scores.ai.is_none());
         assert!(card.style_scores.translationese.is_none());
-        assert_eq!(card.style_scores.consistency, Some(0.0));
+        assert_eq!(card.style_scores.regional_density, Some(0.0));
         assert!(card.top_issues_per_axis.ai.is_empty());
     }
 
@@ -182,10 +208,10 @@ mod tests {
         ];
         let card = StyleScorecard::build(None, None, &issues, 1000);
         // 2 cross_strait per 1000 chars = 2.0 raw → capped 1.0.
-        assert_eq!(card.style_scores.consistency, Some(1.0));
+        assert_eq!(card.style_scores.regional_density, Some(1.0));
         assert_eq!(card.top_issues_per_axis.ai.len(), 1);
         assert_eq!(card.top_issues_per_axis.translationese.len(), 1);
-        assert_eq!(card.top_issues_per_axis.consistency.len(), 2);
+        assert_eq!(card.top_issues_per_axis.regional_density.len(), 2);
     }
 
     #[test]

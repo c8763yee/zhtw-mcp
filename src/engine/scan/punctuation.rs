@@ -111,6 +111,15 @@ impl Scanner {
                     if !immediate_cjk(text, i, true) || !immediate_cjk(text, i + 1, false) {
                         continue;
                     }
+
+                    // A bracket is half of a pair, and the test above reads
+                    // only its own neighbours. In 上海電影譯製廠(1957 成立)。
+                    // the opener fails on the digit while the closer passes, so
+                    // judging each one alone yields the mismatched (1957
+                    // 成立）. Require the partner to qualify too.
+                    if !paren_partner_is_convertible(text, i, b == b'(', excluded) {
+                        continue;
+                    }
                     let (found, suggestion, context) = if b == b'(' {
                         (
                             "(",
@@ -465,4 +474,69 @@ impl Scanner {
             ));
         }
     }
+}
+
+/// How far to look for a bracket's partner. Bounded so that a line of nothing
+/// but brackets cannot turn the enclosing per-byte walk quadratic; no real
+/// parenthetical in prose runs longer.
+const PAREN_PARTNER_SEARCH_BYTES: usize = 512;
+
+/// Whether the bracket pairing with the one at "index" is itself surrounded by
+/// CJK, so that converting both keeps the pair matched.
+///
+/// Depth counting rather than the first bracket in the direction of travel, so
+/// a nested pair does not claim the outer partner. An unpaired bracket, one
+/// whose partner is on another line, and one further away than the bound above
+/// are all left half-width.
+fn paren_partner_is_convertible(
+    text: &str,
+    index: usize,
+    opening: bool,
+    excluded: &[ByteRange],
+) -> bool {
+    let bytes = text.as_bytes();
+
+    // The partner has to be convertible on the same terms this bracket was, and
+    // an excluded one never is: the main walk skips it, so converting this half
+    // alone would split the pair just as a failed CJK test would.
+    let qualifies = |j: usize| {
+        !is_excluded(j, j + 1, excluded)
+            && immediate_cjk(text, j, true)
+            && immediate_cjk(text, j + 1, false)
+    };
+    let mut depth = 0i32;
+    if opening {
+        let stop = bytes
+            .len()
+            .min(index.saturating_add(PAREN_PARTNER_SEARCH_BYTES));
+        for (j, &byte) in bytes.iter().enumerate().take(stop).skip(index) {
+            match byte {
+                b'\n' => return false,
+                b'(' => depth += 1,
+                b')' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        return qualifies(j);
+                    }
+                }
+                _ => {}
+            }
+        }
+    } else {
+        let stop = index.saturating_sub(PAREN_PARTNER_SEARCH_BYTES);
+        for j in (stop..=index).rev() {
+            match bytes[j] {
+                b'\n' => return false,
+                b')' => depth += 1,
+                b'(' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        return qualifies(j);
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    false
 }

@@ -47,6 +47,7 @@ pub(crate) struct LintBatchParams<'a> {
     /// detect_translationese).
     pub(crate) detect_style: bool,
     pub(crate) translationese_domain: zhtw_mcp::engine::translationese_score::TranslationeseDomain,
+    pub(crate) document_genre: zhtw_mcp::rules::ruleset::DocumentGenre,
     pub(crate) ai_threshold_multiplier: f32,
     pub(crate) tm_path: Option<PathBuf>,
     /// Project glossary (`[glossary]` section in `.zhtw-mcp.toml`).
@@ -135,6 +136,7 @@ fn build_lint_setup(
         cfg.translationese_detection = true;
     }
     cfg.translationese_domain = params.translationese_domain;
+    cfg.document_genre = params.document_genre;
 
     // Build scanner once for all files, merging overrides + active packs.
     let ruleset = zhtw_mcp::rules::loader::load_embedded_ruleset()?;
@@ -255,6 +257,16 @@ pub(crate) fn content_type_for(
 
 pub(crate) fn run_lint_batch(params: &LintBatchParams<'_>) -> Result<()> {
     let c = if use_color() { &COLORS_ON } else { &COLORS_OFF };
+
+    // Before anything is read, scanned or rewritten. Checking this per file
+    // meant "--fix --verify" had already written the file back to disk by the
+    // time it refused, and then refused once per file with no report for any of
+    // them. The refusal is about the whole invocation, so it belongs here.
+    #[cfg(feature = "translate")]
+    if params.verify {
+        zhtw_mcp::engine::translate::refuse_if_network_disabled("--verify")
+            .map_err(|e| anyhow::anyhow!(e))?;
+    }
 
     let profile = match params.profile_name {
         None => zhtw_mcp::rules::ruleset::Profile::Base,

@@ -33,8 +33,13 @@
     "from",
     "negative_context_clues",
     "positional_clues",
+    "source",
+    "structural_guard",
     "tags",
     "to",
     "type"
+  ],
+  "structural_guards": [
+    "uncited_attribution"
   ]
 }

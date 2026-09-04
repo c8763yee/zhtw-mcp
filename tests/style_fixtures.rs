@@ -5,10 +5,11 @@
 // point: a detector that fires on everything passes the bad half and fails the
 // good half, so both directions have to hold.
 //
-// `writing_humanizer/` is staged for a detector that does not exist yet,
-// covering newer-generation LLM tells such as slogan repetition and metaphor
-// chains, so its check is #[ignore]d rather than deleted. Run `cargo test
-// --test style_fixtures -- --ignored` to see what is still missing.
+// "writing_humanizer/" covers newer-generation LLM tells whose evidence is
+// structural as well as lexical (for example slogan repetition and metaphor
+// chains). Keep this suite on the full AI-review path: the base profile only
+// enables individual filler rules, whereas "detect_ai" also enables the
+// boundary-aware structural passes.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -33,7 +34,13 @@ fn scan(text: &str) -> Vec<Issue> {
             let ruleset = load_embedded_ruleset().expect("embedded ruleset loads");
             Scanner::new(ruleset.spelling_rules, ruleset.case_rules)
         })
-        .scan_for_content_type(text, ContentType::Plain, Profile::Base)
+        .scan_for_content_type_with_config(text, ContentType::Plain, {
+            let mut cfg = Profile::Base.config();
+            cfg.ai_semantic_safety = true;
+            cfg.ai_density_detection = true;
+            cfg.ai_structural_patterns = true;
+            cfg
+        })
         .issues
 }
 
@@ -121,9 +128,45 @@ fn translationese_fixtures_drive_the_translationese_axis() {
 }
 
 #[test]
-#[ignore = "no detector for slogan repetition or metaphor chains yet"]
 fn writing_humanizer_fixtures_drive_the_ai_filler_axis() {
     check_axis("writing_humanizer", IssueType::AiStyle);
+}
+
+#[test]
+fn newer_llm_tell_fixtures_drive_the_ai_filler_axis() {
+    let dir = fixtures_dir("writing_humanizer");
+
+    // Assert per phrase, not merely that the file produced something. With a
+    // bare "!found.is_empty()" any one rule firing satisfied the whole file, so
+    // four of pattern32's five rules could rot undetected.
+    for (name, phrases) in [
+        (
+            "pattern32_bad.txt",
+            &["截至我所掌握的資訊", "沒有人告訴你的是", "大家都錯了"][..],
+        ),
+        (
+            "pattern33_bad.txt",
+            &["很可能出身於", "為人低調鮮少公開"][..],
+        ),
+        ("pattern35_bad.txt", &["最妙的是：", "更可怕的是："][..]),
+        (
+            "pattern36_bad.txt",
+            &[
+                "大多數人都搞錯了",
+                "大部分人都搞錯了",
+                "這是90%的人忽略的",
+                "這是 90% 的人忽略的",
+            ][..],
+        ),
+    ] {
+        let found = hits(&dir.join(name), &[IssueType::AiStyle]);
+        for phrase in phrases {
+            assert!(
+                found.iter().any(|hit| hit == phrase),
+                "{name}: missing match for {phrase}; got {found:?}"
+            );
+        }
+    }
 }
 
 /// The good half of the pending directory must already be clean, otherwise

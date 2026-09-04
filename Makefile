@@ -1,5 +1,10 @@
 S2T_DATA := src/engine/s2t_data.rs
 OPENCC_DICT_DIR := data/opencc
+# CI supplies the pull request's base commit so the provenance gate compares
+# against the ruleset before the change under test. Local runs retain HEAD,
+# which also catches uncommitted additions. `?=` does not replace a defined
+# empty environment variable, so normalize it before it reaches argparse.
+RULESET_BASELINE_EFFECTIVE := $(or $(strip $(RULESET_BASELINE)),HEAD)
 
 # What make tracks, because $(S2T_DATA) cannot record that the generator ran:
 # the generator rewrites it only when the tables change, so after any Cargo.toml
@@ -54,7 +59,7 @@ check: $(S2T_STAMP)
 	cargo clippy --lib --no-default-features --features browser-wasm -- -D warnings
 	cargo fmt --check
 	black --check .
-	python3 scripts/check-ruleset.py --lint
+	python3 scripts/check-ruleset.py --lint --baseline-ref $(RULESET_BASELINE_EFFECTIVE)
 
 check-size: all
 	@SIZE=$$(wc -c < target/release/zhtw-mcp | tr -d ' '); \
@@ -68,8 +73,8 @@ check-size: all
 
 indent: $(S2T_STAMP)
 	cargo fmt
-	python3 scripts/check-ruleset.py
-	python3 scripts/check-ruleset.py --lint
+	python3 scripts/check-ruleset.py --baseline-ref $(RULESET_BASELINE_EFFECTIVE)
+	python3 scripts/check-ruleset.py --lint --baseline-ref $(RULESET_BASELINE_EFFECTIVE)
 	black .
 
 corpus: $(S2T_STAMP)

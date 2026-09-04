@@ -69,6 +69,14 @@ pub struct Overrides {
     pub spelling: Vec<SpellingRule>,
     #[serde(default)]
     pub case: Vec<CaseRule>,
+    /// Tags to switch off wholesale. A rule carrying any of these is dropped
+    /// before it reaches the scanner.
+    ///
+    /// Disabling by name needs one entry per rule, which is unworkable for a
+    /// whole family: "src:humanizer" alone covers over a hundred rules. This
+    /// is what the tags field was always documented to be for.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub disabled_tags: Vec<String>,
 }
 
 impl Default for Overrides {
@@ -76,6 +84,7 @@ impl Default for Overrides {
         Self {
             schema_version: SCHEMA_VERSION,
             metadata: None,
+            disabled_tags: Vec::new(),
             spelling: Vec::new(),
             case: Vec::new(),
         }
@@ -130,9 +139,51 @@ impl OverrideStore {
         atomic_write_json(&self.path, overrides)
     }
 
-    /// The path to the override file.
-    pub fn path(&self) -> &Path {
-        &self.path
+    /// Edit the overrides under the file lock and persist the result.
+    ///
+    /// Every mutation is the same five steps: take the lock, re-read the file,
+    /// clone, edit, flush. Writing those out per mutator made the sequence a
+    /// convention, and a convention is one forgetful mutator away from the
+    /// staleness bug this replaced: the lock serialised the writes but nothing
+    /// refreshed the snapshot taken at open time, so two stores on one file
+    /// each overwrote the other. Here the invariant is the only way in.
+    ///
+    /// "edit" reports whether it changed anything, so a delete that matched
+    /// nothing neither writes nor disturbs the in-memory copy.
+    ///
+    /// A file that no longer parses, or that carries a different schema
+    /// version, is left for "open" to back up and reset. Resetting it from
+    /// here would discard a concurrent writer's work on the strength of a
+    /// partial read, and the flush that follows still writes a valid file.
+    fn with_overrides<T>(&mut self, edit: impl FnOnce(&mut Overrides) -> (T, bool)) -> Result<T> {
+        let _lock = acquire_lock(&self.path)?;
+        if let Ok(content) = std::fs::read_to_string(&self.path) {
+            if let Ok(stored) = serde_json::from_str::<Overrides>(&content) {
+                if stored.schema_version == SCHEMA_VERSION {
+                    self.overrides = stored;
+                }
+            }
+        }
+        let mut pending = self.overrides.clone();
+        let (out, changed) = edit(&mut pending);
+        if changed {
+            self.flush_pending(&pending)?;
+            self.overrides = pending;
+        }
+        Ok(out)
+    }
+
+    /// Switch off every rule carrying one of these tags.
+    pub fn set_disabled_tags(&mut self, tags: Vec<String>) -> Result<()> {
+        self.with_overrides(|next| {
+            next.disabled_tags = tags;
+            ((), true)
+        })
+    }
+
+    /// Tags this store switches off wholesale.
+    pub fn disabled_tags(&self) -> &[String] {
+        &self.overrides.disabled_tags
     }
 
     /// Load spelling rules: embedded base rules merged with overrides.
@@ -149,35 +200,29 @@ impl OverrideStore {
     ///
     /// Persists atomically: in-memory state only updates after flush succeeds.
     pub fn upsert_spelling_override(&mut self, rule: &SpellingRule) -> Result<()> {
-        let _lock = acquire_lock(&self.path)?;
-        let mut pending = self.overrides.clone();
-        if let Some(pos) = pending.spelling.iter().position(|r| r.from == rule.from) {
-            pending.spelling[pos] = rule.clone();
-        } else {
-            pending.spelling.push(rule.clone());
-        }
-        self.flush_pending(&pending)?;
-        self.overrides = pending;
-        Ok(())
+        self.with_overrides(|pending| {
+            match pending.spelling.iter().position(|r| r.from == rule.from) {
+                Some(pos) => pending.spelling[pos] = rule.clone(),
+                None => pending.spelling.push(rule.clone()),
+            }
+            ((), true)
+        })
     }
 
     /// Upsert a case rule override.
     pub fn upsert_case_override(&mut self, rule: &CaseRule) -> Result<()> {
-        let _lock = acquire_lock(&self.path)?;
         let lower = rule.term.to_lowercase();
-        let mut pending = self.overrides.clone();
-        if let Some(pos) = pending
-            .case
-            .iter()
-            .position(|r| r.term.to_lowercase() == lower)
-        {
-            pending.case[pos] = rule.clone();
-        } else {
-            pending.case.push(rule.clone());
-        }
-        self.flush_pending(&pending)?;
-        self.overrides = pending;
-        Ok(())
+        self.with_overrides(|pending| {
+            match pending
+                .case
+                .iter()
+                .position(|r| r.term.to_lowercase() == lower)
+            {
+                Some(pos) => pending.case[pos] = rule.clone(),
+                None => pending.case.push(rule.clone()),
+            }
+            ((), true)
+        })
     }
 
     /// Disable a spelling rule by writing a disabled override.
@@ -201,31 +246,23 @@ impl OverrideStore {
 
     /// Delete a spelling rule override. Returns true if it existed.
     pub fn delete_spelling_override(&mut self, from_key: &str) -> Result<bool> {
-        let _lock = acquire_lock(&self.path)?;
-        let mut pending = self.overrides.clone();
-        let before = pending.spelling.len();
-        pending.spelling.retain(|r| r.from != from_key);
-        let existed = pending.spelling.len() < before;
-        if existed {
-            self.flush_pending(&pending)?;
-            self.overrides = pending;
-        }
-        Ok(existed)
+        self.with_overrides(|pending| {
+            let before = pending.spelling.len();
+            pending.spelling.retain(|r| r.from != from_key);
+            let existed = pending.spelling.len() < before;
+            (existed, existed)
+        })
     }
 
     /// Delete a case rule override. Returns true if it existed.
     pub fn delete_case_override(&mut self, term: &str) -> Result<bool> {
-        let _lock = acquire_lock(&self.path)?;
         let lower = term.to_lowercase();
-        let mut pending = self.overrides.clone();
-        let before = pending.case.len();
-        pending.case.retain(|r| r.term.to_lowercase() != lower);
-        let existed = pending.case.len() < before;
-        if existed {
-            self.flush_pending(&pending)?;
-            self.overrides = pending;
-        }
-        Ok(existed)
+        self.with_overrides(|pending| {
+            let before = pending.case.len();
+            pending.case.retain(|r| r.term.to_lowercase() != lower);
+            let existed = pending.case.len() < before;
+            (existed, existed)
+        })
     }
 
     /// Clear all overrides.
@@ -996,9 +1033,14 @@ pub fn build_merged_rules(
         vec![store.load_spelling_rules(base_spelling)];
     let mut case_layers: Vec<Vec<CaseRule>> = vec![store.load_case_rules(base_case)];
 
+    // Any layer may switch a tag off, and the union applies to the result, so a
+    // pack can retire a family without knowing which layer supplied it.
+    let mut disabled_tags: Vec<String> = store.disabled_tags().to_vec();
+
     for pack_name in active_packs {
         match pack_store.load(pack_name) {
             Ok(pack) => {
+                disabled_tags.extend(pack.disabled_tags.iter().cloned());
                 spelling_layers.push(pack.spelling);
                 case_layers.push(pack.case);
             }
@@ -1012,10 +1054,53 @@ pub fn build_merged_rules(
         spelling_layers.iter().map(|v| v.as_slice()).collect();
     let case_refs: Vec<&[CaseRule]> = case_layers.iter().map(|v| v.as_slice()).collect();
 
-    (
-        merge_spelling_rules(&spelling_refs),
-        merge_case_rules(&case_refs),
-    )
+    let mut spelling = merge_spelling_rules(&spelling_refs);
+    drop_disabled_tags(&spelling_layers, &mut spelling, &disabled_tags);
+    (spelling, merge_case_rules(&case_refs))
+}
+
+/// Drop every rule carrying a disabled tag, and say what that did.
+///
+/// Retiring a family is bulk surgery, and both directions are worth a line: a
+/// misspelled tag removes nothing, and a correct one can remove a hundred
+/// rules a caller still depends on.
+///
+/// The known-tag set is read from the layers rather than from the merged
+/// result. "merge_spelling_rules" has already dropped watchlisted rules by
+/// then, so a tag carried only by those would report as unknown, which is the
+/// opposite of the truth.
+fn drop_disabled_tags(
+    layers: &[Vec<SpellingRule>],
+    spelling: &mut Vec<SpellingRule>,
+    disabled_tags: &[String],
+) {
+    if disabled_tags.is_empty() {
+        return;
+    }
+    let carries = |rule: &SpellingRule| {
+        rule.tags
+            .as_deref()
+            .unwrap_or_default()
+            .iter()
+            .any(|tag| disabled_tags.contains(tag))
+    };
+    for tag in disabled_tags {
+        if !layers
+            .iter()
+            .flatten()
+            .any(|r| r.tags.as_deref().unwrap_or_default().contains(tag))
+        {
+            tracing::warn!("disabled_tags names '{tag}', which no rule carries");
+        }
+    }
+    let before = spelling.len();
+    spelling.retain(|rule| !carries(rule));
+    if before > spelling.len() {
+        tracing::info!(
+            "disabled_tags {disabled_tags:?} retired {} rule(s)",
+            before - spelling.len()
+        );
+    }
 }
 
 /// Merge spelling rules from multiple layers. Later layers override earlier
@@ -1146,6 +1231,141 @@ mod tests {
     }
 
     #[test]
+    fn a_disabled_tag_retires_a_whole_family() {
+        let dir = tempfile::tempdir().unwrap();
+        let base = crate::rules::loader::load_embedded_ruleset()
+            .unwrap()
+            .spelling_rules;
+
+        // Enabled only: the merge already drops watchlisted rules, so they
+        // cannot be dropped a second time by the tag.
+        let tagged = base
+            .iter()
+            .filter(|r| {
+                !r.disabled
+                    && r.tags
+                        .as_ref()
+                        .is_some_and(|t| t.iter().any(|x| x == "src:humanizer"))
+            })
+            .count();
+        assert!(tagged > 1, "fixture needs a family, got {tagged}");
+
+        let store = OverrideStore::open(&dir.path().join("o.json")).unwrap();
+        let packs = PackStore::new(dir.path().join("packs"));
+        let (kept, _) = build_merged_rules(&base, &[], &store, &packs, &[]);
+        let before = kept.len();
+
+        let mut off = OverrideStore::open(&dir.path().join("off.json")).unwrap();
+        off.set_disabled_tags(vec!["src:humanizer".into()]).unwrap();
+        let (after, _) = build_merged_rules(&base, &[], &off, &packs, &[]);
+
+        assert_eq!(
+            before - after.len(),
+            tagged,
+            "disabling a tag must drop exactly the rules carrying it"
+        );
+        assert!(!after.iter().any(|r| r
+            .tags
+            .as_ref()
+            .is_some_and(|t| t.iter().any(|x| x == "src:humanizer"))));
+    }
+
+    // Two stores open on the same file each wrote back the snapshot they took
+    // when they opened, so whichever flushed last erased the other's work.
+    #[test]
+    fn a_second_store_does_not_erase_the_first() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("overrides.json");
+        let mut a = OverrideStore::open(&path).unwrap();
+        let mut b = OverrideStore::open(&path).unwrap();
+
+        a.set_disabled_tags(vec!["src:humanizer".into()]).unwrap();
+        b.upsert_spelling_override(&SpellingRule::new(
+            "視頻",
+            vec!["影片".into()],
+            RuleType::CrossStrait,
+        ))
+        .unwrap();
+
+        let reopened = OverrideStore::open(&path).unwrap();
+        assert_eq!(reopened.disabled_tags(), ["src:humanizer"]);
+        assert!(
+            reopened.overrides.spelling.iter().any(|r| r.from == "視頻"),
+            "second writer's rule lost"
+        );
+    }
+
+    // The disabled-tag union is applied to the merged result, so a pack can
+    // retire a family the base ruleset supplied. The test above exercises only
+    // the overrides layer and passes no active packs, which left this half of
+    // the union unexercised.
+    #[test]
+    fn a_pack_can_retire_a_base_rule_family() {
+        let dir = tempfile::tempdir().unwrap();
+        let base = crate::rules::loader::load_embedded_ruleset()
+            .unwrap()
+            .spelling_rules;
+        let tagged = base
+            .iter()
+            .filter(|r| {
+                !r.disabled
+                    && r.tags
+                        .as_ref()
+                        .is_some_and(|t| t.iter().any(|x| x == "src:humanizer"))
+            })
+            .count();
+        assert!(tagged > 1, "fixture needs a family, got {tagged}");
+
+        let pack_dir = dir.path().join("packs");
+        std::fs::create_dir_all(&pack_dir).unwrap();
+        let pack = Overrides {
+            disabled_tags: vec!["src:humanizer".into()],
+            ..Default::default()
+        };
+        std::fs::write(
+            pack_dir.join("retire.json"),
+            serde_json::to_string(&pack).unwrap(),
+        )
+        .unwrap();
+
+        let store = OverrideStore::open(&dir.path().join("o.json")).unwrap();
+        let packs = PackStore::new(pack_dir);
+        let (before, _) = build_merged_rules(&base, &[], &store, &packs, &[]);
+        let (after, _) = build_merged_rules(&base, &[], &store, &packs, &["retire".to_string()]);
+        assert_eq!(before.len() - after.len(), tagged);
+        assert!(!after.iter().any(|r| r
+            .tags
+            .as_ref()
+            .is_some_and(|t| t.iter().any(|x| x == "src:humanizer"))));
+    }
+
+    #[test]
+    fn colon_reveal_rule_remains_overridable() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("overrides.json");
+        let mut store = OverrideStore::open(&path).unwrap();
+        let base = crate::rules::loader::load_embedded_ruleset()
+            .unwrap()
+            .spelling_rules;
+
+        // Must be a rule that is enabled in the shipped ruleset, or the merge
+        // drops it for being disabled and the assertion below passes whether or
+        // not the override mechanism works.
+        assert!(
+            base.iter()
+                .any(|rule| rule.from == "更可怕的是：" && !rule.disabled),
+            "fixture rule must ship enabled for this test to prove anything"
+        );
+        store.disable_spelling_rule("更可怕的是：").unwrap();
+
+        let merged = store.load_spelling_rules(&base);
+        assert!(
+            !merged.iter().any(|rule| rule.from == "更可怕的是："),
+            "a disabled colon-reveal rule must not reach the scanner"
+        );
+    }
+
+    #[test]
     fn disable_builtin_case_rule() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("overrides.json");
@@ -1216,6 +1436,7 @@ mod tests {
                 RuleType::CrossStrait,
             )],
             case: vec![],
+            disabled_tags: Vec::new(),
         };
         std::fs::write(&path, serde_json::to_string(&bad).unwrap()).unwrap();
 

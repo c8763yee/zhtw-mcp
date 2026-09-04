@@ -2155,3 +2155,45 @@
             "text after excluded region must not bleed in"
         );
     }
+
+// A style guide has to write the forbidden phrase down once to forbid it, and
+// ❌/✅ is the convention every zh-TW writing guide we vendored uses for it.
+// Without the specimen rule the linter flags the document that teaches people
+// to delete the phrase. The integration side is covered by the
+// native_specimen_* corpus cases; this pins the marker parsing, which is where
+// the edge cases are.
+#[test]
+fn mention_marker_line_parsing() {
+    for marked in [
+        "❌ 值得注意的是",
+        "- ❌ 值得注意的是",
+        "* ✅ 這個做法更精確",
+        "+ ✓ 通過",
+        "> ❌ 值得注意的是",
+        "> - ❌ 值得注意的是",
+        "> > + ✗ 值得注意的是",
+        "1. ❌ 值得注意的是",
+        "12) ✅ 值得注意的是",
+        "   - ❌ 值得注意的是",
+    ] {
+        assert!(
+            is_mention_marker_line(marked),
+            "should be a mention marker: {marked:?}"
+        );
+    }
+    for ordinary in [
+        "值得注意的是這個模組會阻塞。",
+        // Mid-sentence the marker is being used, not labelling a specimen.
+        "這個功能已完成 ✅ 值得注意的是它會阻塞。",
+        // A bullet without a marker is just a bullet.
+        "- 值得注意的是這件事",
+        // The digits have to be a list number, not the start of the content.
+        "2026 年的計畫 ❌ 尚未定案",
+        "",
+    ] {
+        assert!(
+            !is_mention_marker_line(ordinary),
+            "should not be a mention marker: {ordinary:?}"
+        );
+    }
+}

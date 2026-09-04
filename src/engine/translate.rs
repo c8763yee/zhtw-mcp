@@ -24,6 +24,8 @@ pub enum TranslateError {
     RateLimit(u16),
     /// JSON parse error in the response.
     Parse(String),
+    /// Outbound network calls are disabled by policy.
+    Disabled,
 }
 
 impl fmt::Display for TranslateError {
@@ -32,11 +34,53 @@ impl fmt::Display for TranslateError {
             Self::Io(msg) => write!(f, "translate I/O error: {msg}"),
             Self::RateLimit(code) => write!(f, "translate rate-limited (HTTP {code})"),
             Self::Parse(msg) => write!(f, "translate parse error: {msg}"),
+            Self::Disabled => write!(f, "outbound network calls are disabled by {NO_NETWORK_ENV}"),
         }
     }
 }
 
 const GOOGLE_TRANSLATE_URL: &str = "https://translate.googleapis.com/translate_a/single";
+
+/// Environment variable that disables every outbound network call.
+///
+/// Set to any value other than empty or "0" to refuse calibration.
+pub const NO_NETWORK_ENV: &str = "ZHTW_NO_NETWORK";
+
+/// Whether outbound network calls are refused by operator policy.
+///
+/// This module is the only code in the crate that opens a socket, and what it
+/// sends is sentence-sized excerpts of the document being linted. A linter
+/// runs over unpublished writing, and under MCP the decision to pass "verify"
+/// belongs to a model rather than to the person whose text it is. An operator
+/// therefore needs a switch that a caller cannot argue its way past, which is
+/// why this is read from the environment rather than taken as a parameter.
+pub fn network_disabled() -> bool {
+    disabled_by(std::env::var_os(NO_NETWORK_ENV).as_deref())
+}
+
+/// Refuse a network-dependent flag when the operator has disabled egress.
+///
+/// One place, so the CLI paths and the MCP path cannot drift apart on what the
+/// policy is or how it is phrased. `flag` is what the caller passed, named back
+/// to them: "--verify" for the CLI, "verify" for the tool argument.
+pub fn refuse_if_network_disabled(flag: &str) -> Result<(), String> {
+    if network_disabled() {
+        return Err(format!(
+            "{flag} needs a network call to Google Translate, which {NO_NETWORK_ENV} forbids"
+        ));
+    }
+    Ok(())
+}
+
+/// The value test, split out from reading the environment.
+///
+/// Kept separate so the off-values can be tested without either mutating
+/// process-global state or, far worse, driving a real `--verify` run just to
+/// observe that it was not refused: that would have posted the fixture to
+/// Google from the test suite for this very feature.
+fn disabled_by(value: Option<&std::ffi::OsStr>) -> bool {
+    value.is_some_and(|v| !v.is_empty() && v != "0")
+}
 const USER_AGENT: &str = "Mozilla/5.0 (compatible; zhtw-anchor/2.0)";
 
 /// Maximum payload bytes sent to Google Translate in a single request.
@@ -92,6 +136,13 @@ pub(crate) fn google_translate_raw(
     src: &str,
     tgt: &str,
 ) -> Result<String, TranslateError> {
+    // Backstop, not the primary check. Callers reject "verify" up front with a
+    // message naming the flag; this is here so a future call path that forgets
+    // to ask still cannot open the socket.
+    if network_disabled() {
+        return Err(TranslateError::Disabled);
+    }
+
     let url = format!(
         "{GOOGLE_TRANSLATE_URL}?client=gtx&sl={src}&tl={tgt}&dt=t&q={}",
         urlencoding::encode(text)
@@ -472,6 +523,21 @@ fn parse_sentinel_segments(translation: &str, expected_count: usize) -> Vec<Stri
 
 #[cfg(test)]
 mod tests {
+    use std::ffi::OsStr;
+
+    #[test]
+    fn no_network_off_values() {
+        // Unset, empty and "0" all leave calibration enabled.
+        assert!(!super::disabled_by(None));
+        assert!(!super::disabled_by(Some(OsStr::new(""))));
+        assert!(!super::disabled_by(Some(OsStr::new("0"))));
+        // Anything else refuses. "false" reads as off to a human but is not a
+        // documented off-value, and guessing wrong here would open the socket.
+        for on in ["1", "true", "yes", "0no", "00"] {
+            assert!(super::disabled_by(Some(OsStr::new(on))), "{on:?}");
+        }
+    }
+
     use super::*;
 
     #[test]

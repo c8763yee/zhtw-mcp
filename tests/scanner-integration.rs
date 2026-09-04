@@ -70,6 +70,44 @@ fn non_traditional_rule_applies_to_simplified_text() {
     assert_eq!(issues.len(), 1);
 }
 
+#[test]
+fn formulaic_section_boundary_works_without_a_markdown_content_type() {
+    // ContentType defaults to Plain, so an MCP caller passing Markdown text
+    // with no filename must still get the detector. The parser index adds
+    // boundaries; it is not a precondition for having any.
+    let scanner = Scanner::new(vec![], vec![]);
+    let mut cfg = Profile::Base.config();
+    cfg.ai_structural_patterns = true;
+    let text = "本節總結。展望未來。\n\n# 下一節\n";
+    for content_type in [ContentType::Markdown, ContentType::Plain] {
+        let issues = scanner
+            .scan_for_content_type_with_config(text, content_type, cfg)
+            .issues;
+        assert!(
+            issues.iter().any(|issue| issue.found == "展望未來"),
+            "closer lost for {content_type:?}: {issues:?}"
+        );
+    }
+}
+
+#[test]
+fn a_code_fence_is_not_a_section_boundary_in_either_content_type() {
+    // The lead-in sentence before a fence is ordinary technical prose.
+    let scanner = Scanner::new(vec![], vec![]);
+    let mut cfg = Profile::Base.config();
+    cfg.ai_structural_patterns = true;
+    let text = "## 安裝\n\n新版套件終於支援離線安裝，值得期待。\n\n```sh\nmake install\n```\n\n安裝完成後即可使用。\n";
+    for content_type in [ContentType::Markdown, ContentType::Plain] {
+        let issues = scanner
+            .scan_for_content_type_with_config(text, content_type, cfg)
+            .issues;
+        assert!(
+            !issues.iter().any(|issue| issue.found == "值得期待"),
+            "lead-in flagged as a closer for {content_type:?}: {issues:?}"
+        );
+    }
+}
+
 // Code block exclusion — spelling rules (5 tests)
 
 #[test]
@@ -993,5 +1031,42 @@ fn ai_density_detection_suppressed_in_base_profile() {
     assert!(
         density_issues.is_empty(),
         "default profile should NOT run density detection"
+    );
+}
+
+// Four performance bugs in one week shared a shape: an index whose build walks
+// the whole document, called from inside a loop over paragraphs. Output is
+// identical either way, so only the clock changes and no assertion notices.
+// engine::index_guard counts builds per scan and trips in debug builds; this
+// drives a real multi-paragraph scan so that counter is actually evaluated.
+#[test]
+fn document_scoped_indexes_are_built_once_per_scan() {
+    let ruleset: zhtw_mcp::rules::ruleset::Ruleset =
+        serde_json::from_str(include_str!("../assets/ruleset.json")).expect("ruleset parses");
+    let scanner = Scanner::new(ruleset.spelling_rules, ruleset.case_rules);
+
+    // Many paragraphs, many sentences, and the shapes that make the indexes get
+    // built at all: a closing phrase, an attribution, a citation.
+    let unit = "這個模組需要最佳化。研究顯示成果很好。專家認為這項安排可行[1]。\n\n\
+                總的來說，這是一個值得注意的現象。綜上所述，效能已明顯改善。\n\n";
+    let text = unit.repeat(40);
+
+    let mut cfg = Profile::Strict.config();
+    cfg.ai_filler_detection = true;
+    cfg.ai_semantic_safety = true;
+    cfg.ai_density_detection = true;
+    cfg.ai_structural_patterns = true;
+    cfg.translationese_detection = true;
+
+    // The assertion lives at the end of the scan itself, so reaching this line
+    // without a panic is the check. Confirm the scan did real work, or a future
+    // change that stopped scanning would pass this silently.
+    let excluded =
+        zhtw_mcp::engine::scan::build_exclusions_for_content_type(&text, ContentType::Markdown);
+    let out =
+        scanner.scan_with_prebuilt_excluded_config(&text, &excluded, cfg, ContentType::Markdown);
+    assert!(
+        !out.issues.is_empty(),
+        "the fixture must produce findings, or the guard sees an empty scan"
     );
 }

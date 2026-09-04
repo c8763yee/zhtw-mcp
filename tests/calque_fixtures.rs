@@ -13,7 +13,7 @@ use std::path::{Path, PathBuf};
 
 use zhtw_mcp::engine::scan::{ContentType, Scanner};
 use zhtw_mcp::rules::loader::load_embedded_ruleset;
-use zhtw_mcp::rules::ruleset::{Issue, IssueType, Profile};
+use zhtw_mcp::rules::ruleset::{Issue, PhaseFamily, PhasePass, Profile};
 
 const FIXTURE_PREFIX: &str = "calque_";
 
@@ -24,24 +24,34 @@ fn fixtures_dir() -> PathBuf {
         .join("calque")
 }
 
+/// Map a fixture ID's detector code to the family it names. Fixture IDs keep
+/// the ZY vocabulary on purpose: they are stable identifiers, unlike the
+/// messages, which is why selection goes through this rather than through
+/// prose.
+fn identity_of(code: &str) -> (PhaseFamily, PhasePass) {
+    match code {
+        "ZY1a" => (PhaseFamily::YiZhi, PhasePass::Lexical),
+        "ZY1b" => (PhaseFamily::YiZhi, PhasePass::Indexed),
+        "ZY2a" => (PhaseFamily::Connective, PhasePass::Lexical),
+        "ZY2b" => (PhaseFamily::Connective, PhasePass::Indexed),
+        "ZY3a" => (PhaseFamily::Nominalization, PhasePass::Lexical),
+        "ZY3b" => (PhaseFamily::Nominalization, PhasePass::Indexed),
+        "ZY4a" => (PhaseFamily::FalseFriend, PhasePass::Lexical),
+        "ZY5" => (PhaseFamily::LongPremodifier, PhasePass::Lexical),
+        other => panic!("unhandled detector code in test: {other}"),
+    }
+}
+
 fn scan_fixture(text: &str) -> Vec<Issue> {
     let ruleset = load_embedded_ruleset().expect("embedded ruleset loads");
     let scanner = Scanner::new(ruleset.spelling_rules, ruleset.case_rules);
     let out = scanner.scan_for_content_type(text, ContentType::Plain, Profile::Base);
     out.issues
         .into_iter()
-        .filter(|i| matches!(i.rule_type, IssueType::Translationese))
         .filter(|i| {
-            i.context.as_ref().is_some_and(|c| {
-                c.contains("ZY1a")
-                    || c.contains("ZY1b")
-                    || c.contains("ZY2a")
-                    || c.contains("ZY2b")
-                    || c.contains("ZY3a")
-                    || c.contains("ZY3b")
-                    || c.contains("ZY4a")
-                    || c.contains("ZY5")
-            })
+            // The ZY detectors, selected by identity rather than by the wording
+            // of the message they emit.
+            i.phase_family.is_some()
         })
         .collect()
 }
@@ -111,34 +121,29 @@ fn calque_bad_fixtures_fire_their_detector() {
         });
         let issues = scan_fixture(body);
 
-        // Detector-family equivalence: scan_with_config's
-        // `dedup_translationese_phase_duplicates` suppresses a substring- only
-        // issue (ZY2a / ZY3a) when its boundary-aware sibling (ZY2b / ZY3b)
-        // covers the same span. Substring-only fixture IDs may therefore see
-        // their boundary-aware sibling fire instead — both belong to the same
-        // family and either satisfies the gate.
-        let acceptable: &[&str] = match detector {
-            "ZY2a" => &["ZY2a", "ZY2b"],
-            "ZY3a" => &["ZY3a", "ZY3b"],
-            "ZY1a" => &["ZY1a"],
-            "ZY1b" => &["ZY1b"],
-            "ZY2b" => &["ZY2b"],
-            "ZY3b" => &["ZY3b"],
-            "ZY4a" => &["ZY4a"],
-            "ZY5" => &["ZY5"],
-            other => panic!("unhandled detector code in test: {other}"),
-        };
+        // The fixture ID names the detector; selection is by identity, so
+        // rewording a message cannot break these assertions.
+        //
+        // Which pass has to fire depends on the direction the deduplication
+        // runs. "dedup_translationese_phase_duplicates" drops a lexical issue
+        // when its indexed sibling covers the same span, never the reverse, so
+        // a lexical fixture may legitimately see only the indexed detector and
+        // either pass satisfies it. An indexed fixture has no such excuse:
+        // accepting its lexical sibling would let the sentence-bounded and
+        // density logic go quiet without a single test noticing.
+        let (expected_family, expected_pass) = identity_of(detector);
         let fires = issues.iter().any(|i| {
-            i.context
-                .as_ref()
-                .is_some_and(|c| acceptable.iter().any(|code| c.contains(code)))
+            i.phase_family.is_some_and(|(family, pass)| {
+                family == expected_family
+                    && (expected_pass == PhasePass::Lexical || pass == expected_pass)
+            })
         });
         assert!(
             fires,
-            "{name} expected to fire one of {acceptable:?}, got contexts: {:?}",
+            "{name} expected to fire {expected_family:?}/{expected_pass:?}, got: {:?}",
             issues
                 .iter()
-                .filter_map(|i| i.context.as_ref().map(|c| c.to_string()))
+                .filter_map(|i| i.phase_family.map(|f| format!("{f:?}")))
                 .collect::<Vec<_>>()
         );
     }
@@ -172,20 +177,21 @@ fn calque_good_and_solo_fixtures_emit_zero_zy_issues() {
                 "{name} (substring-only good) should produce zero ZY issues, got: {:?}",
                 issues
                     .iter()
-                    .filter_map(|i| i.context.as_ref().map(|c| c.to_string()))
+                    .filter_map(|i| i.phase_family.map(|id| format!("{id:?}")))
                     .collect::<Vec<_>>()
             );
         } else if let Some(d) = detector {
             // Boundary-aware fixtures: only the NAMED detector must not fire.
-            let fires_self = issues
-                .iter()
-                .any(|i| i.context.as_ref().is_some_and(|c| c.contains(d)));
+            // Selected by identity: the codes this used to match on are gone
+            // from the messages, so the assertion had stopped testing anything.
+            let want = identity_of(d);
+            let fires_self = issues.iter().any(|i| i.phase_family == Some(want));
             assert!(
                 !fires_self,
-                "{name} should not fire {d}, got: {:?}",
+                "{name} should not fire {want:?}, got: {:?}",
                 issues
                     .iter()
-                    .filter_map(|i| i.context.as_ref().map(|c| c.to_string()))
+                    .filter_map(|i| i.phase_family.map(|id| format!("{id:?}")))
                     .collect::<Vec<_>>()
             );
         }

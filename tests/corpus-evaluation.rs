@@ -24,6 +24,15 @@ struct CorpusCase {
     input: String,
     #[serde(default)]
     scan_text: Option<String>,
+    #[serde(default)]
+    content_type: Option<String>,
+    /// Per-case override of the spec's "detect_ai". The native corpus runs
+    /// with the AI filter off, which left the AI-only detectors with no
+    /// false-positive coverage at all: a detector that fires on ordinary
+    /// zh-TW could not move "fp_rate" because it never ran. Cases that name a
+    /// specific AI detector set this to measure it.
+    #[serde(default)]
+    detect_ai: Option<bool>,
     expected_fixed: String,
     expected_issues: Vec<ExpectedIssue>,
 }
@@ -39,6 +48,14 @@ struct ExpectedIssue {
 
 fn default_occurrence() -> usize {
     1
+}
+
+fn case_content_type(case: &CorpusCase) -> ContentType {
+    match case.content_type.as_deref() {
+        None => ContentType::Plain,
+        Some(name) => ContentType::from_name(name)
+            .unwrap_or_else(|| panic!("unknown content_type {name:?} in corpus case {}", case.id)),
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -86,11 +103,11 @@ fn load_scanner() -> (Scanner, Segmenter) {
     (scanner, segmenter)
 }
 
-fn build_config(spec: &CorpusSpec) -> ProfileConfig {
+fn build_config(spec: &CorpusSpec, detect_ai: bool) -> ProfileConfig {
     let profile = Profile::from_str_strict(&spec.profile)
         .unwrap_or_else(|| panic!("unknown profile: {}", spec.profile));
     let mut cfg = profile.config();
-    if spec.detect_ai {
+    if detect_ai {
         cfg.ai_filler_detection = true;
         cfg.ai_semantic_safety = true;
         cfg.ai_density_detection = true;
@@ -218,7 +235,6 @@ fn evaluate_positive_corpus(
     segmenter: &Segmenter,
     converter: &S2TConverter,
 ) -> (ScoreCounts, FixCounts, usize) {
-    let cfg = build_config(spec);
     let mut score = ScoreCounts::default();
     let mut fix = FixCounts::default();
     let mut total_bytes = 0usize;
@@ -241,15 +257,17 @@ fn evaluate_positive_corpus(
         };
 
         let expected = resolve_expected_issues(scan_text, &case.expected_issues);
+        let content_type = case_content_type(case);
+        let cfg = build_config(spec, case.detect_ai.unwrap_or(spec.detect_ai));
         let issues = scanner
-            .scan_for_content_type_with_config(scan_text, ContentType::Plain, cfg)
+            .scan_for_content_type_with_config(scan_text, content_type, cfg)
             .issues;
         let doc_score = score_document(&issues, &expected);
         let fixed = apply_fixes_with_context(
             scan_text,
             &issues,
             FixMode::LexicalSafe,
-            &build_exclusions_for_content_type(scan_text, ContentType::Plain),
+            &build_exclusions_for_content_type(scan_text, content_type),
             Some(segmenter),
         );
 
@@ -271,20 +289,21 @@ fn evaluate_native_corpus(
     scanner: &Scanner,
     segmenter: &Segmenter,
 ) -> (NativeCounts, FixCounts, usize) {
-    let cfg = build_config(spec);
     let mut native = NativeCounts::default();
     let mut fix = FixCounts::default();
     let mut total_bytes = 0usize;
 
     for case in &spec.cases {
+        let content_type = case_content_type(case);
+        let cfg = build_config(spec, case.detect_ai.unwrap_or(spec.detect_ai));
         let issues = scanner
-            .scan_for_content_type_with_config(&case.input, ContentType::Plain, cfg)
+            .scan_for_content_type_with_config(&case.input, content_type, cfg)
             .issues;
         let fixed = apply_fixes_with_context(
             &case.input,
             &issues,
             FixMode::LexicalSafe,
-            &build_exclusions_for_content_type(&case.input, ContentType::Plain),
+            &build_exclusions_for_content_type(&case.input, content_type),
             Some(segmenter),
         );
 
@@ -463,4 +482,34 @@ fn corpus_evaluation_suite() {
         "native zh-TW safe-fix gate failed: {:.1}% (expected 100.0%)",
         fix_success_rate(&native_fix)
     );
+
+    // Recall was computed and printed on every run and asserted nowhere, so a
+    // change that halved AI detection passed the suite. That is not
+    // hypothetical: two commits reworked AI detection while this gate did not
+    // exist, and the only thing that would have noticed was a human reading the
+    // printed number.
+    //
+    // Per corpus, not aggregate, because the aggregate is dominated by
+    // cn_to_tw_conversion: it carries roughly twice the true positives of
+    // ai_generated, so AI recall could fall a long way with the aggregate
+    // barely moving.
+    //
+    // Floors sit two points below what each corpus measured when the gate was
+    // added. One point is too tight to survive adding a fixture, which shifts
+    // the denominator; five is wide enough to hide a detector going quiet.
+    for (label, score, min_recall, min_precision) in [
+        ("AI-generated", &ai_score, 94.0, 91.0),
+        ("zh-CN conversion", &cn_score, 98.0, 96.0),
+    ] {
+        assert!(
+            recall(score) >= min_recall,
+            "{label} recall gate failed: {:.1}% (floor {min_recall}%)",
+            recall(score)
+        );
+        assert!(
+            precision(score) >= min_precision,
+            "{label} precision gate failed: {:.1}% (floor {min_precision}%)",
+            precision(score)
+        );
+    }
 }

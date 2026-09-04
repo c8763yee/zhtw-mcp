@@ -262,6 +262,7 @@ fn run_lint(
         detect_translationese: lint.detect_translationese,
         detect_style: lint.detect_style,
         translationese_domain: lint.translationese_domain,
+        document_genre: lint.document_genre,
         ai_threshold_multiplier: lint.ai_threshold_multiplier,
         tm_path: Some(eff_tm_path),
         glossary: eff_glossary,
@@ -475,6 +476,11 @@ fn run_convert(
 
     // Step 4: Optional verification via Google Translate. Requires --verify;
     // see the note on this function.
+    #[cfg(feature = "translate")]
+    if verify {
+        zhtw_mcp::engine::translate::refuse_if_network_disabled("--verify")
+            .map_err(|e| anyhow::anyhow!(e))?;
+    }
     #[cfg(feature = "translate")]
     if verify {
         let excluded =

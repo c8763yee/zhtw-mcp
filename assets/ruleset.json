@@ -242,21 +242,24 @@
     },
     {
       "from": "不可否認",
-      "to": [""],
+      "to": [],
       "type": "ai_filler",
-      "context": "humanize.C2: hollow assertion filler; delete"
+      "context": "hollow assertion filler; assert the claim directly",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "不可或缺",
       "to": [],
       "type": "ai_filler",
-      "context": "humanize.V1: AI signature cliché"
+      "context": "AI signature cliché",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "不可磨滅",
       "to": [],
       "type": "ai_filler",
-      "context": "humanize.C1: grandiose cliché"
+      "context": "Grandiose cliché",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "不容忽視",
@@ -271,16 +274,26 @@
       "context": "AI filler phrase; delete"
     },
     {
-      "from": "不言而喻",
+      "from": "不得不說",
       "to": [""],
       "type": "ai_filler",
-      "context": "writing humanizer: unsupported obviousness marker; explain or delete"
+      "context": "AI filler opener with zero information content; delete",
+      "source": "ai_hedge_openers",
+      "tags": ["src:deaitone"]
+    },
+    {
+      "from": "不言而喻",
+      "to": [],
+      "type": "ai_filler",
+      "context": "unsupported obviousness marker; state the reason instead",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "世界和平作出更大貢獻",
-      "to": [""],
+      "to": [],
       "type": "ai_filler",
-      "context": "writing humanizer: slogan-like sublimating ending; replace with a concrete claim"
+      "context": "slogan-like sublimating ending; replace with a concrete claim",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "丟包",
@@ -405,7 +418,8 @@
       "from": "主要地",
       "to": ["主要"],
       "type": "translationese",
-      "context": "dewesternise.V8: 地 adverbial calque"
+      "context": "地 adverbial calque",
+      "tags": ["src:dewesternise"]
     },
     {
       "from": "主頁",
@@ -447,7 +461,8 @@
       "from": "事先預告",
       "to": ["預告"],
       "type": "translationese",
-      "context": "dewesternise.S1: semantic overlap"
+      "context": "Semantic overlap",
+      "tags": ["src:dewesternise"]
     },
     {
       "from": "事務",
@@ -518,7 +533,8 @@
       "from": "互相合作",
       "to": ["合作"],
       "type": "translationese",
-      "context": "dewesternise.S1: semantic overlap"
+      "context": "Semantic overlap",
+      "tags": ["src:dewesternise"]
     },
     {
       "from": "互聯網",
@@ -567,9 +583,10 @@
     },
     {
       "from": "交織",
-      "to": ["互相影響"],
+      "to": [],
       "type": "ai_filler",
-      "context": "writing humanizer: abstract weaving metaphor; name the relation"
+      "context": "abstract weaving metaphor; name the relation",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "亭式車站",
@@ -654,7 +671,8 @@
       "from": "令人驚豔",
       "to": [],
       "type": "ai_filler",
-      "context": "humanize.C5: promotional cliché"
+      "context": "Promotional cliché",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "令牌",
@@ -669,6 +687,15 @@
       "type": "cross_strait",
       "context": "@domain 網路。IEEE 802.5 token ring 不應意譯，tw 直接使用英文 token ring",
       "english": "token ring"
+    },
+    {
+      "from": "以免造成不便",
+      "to": [],
+      "type": "ai_filler",
+      "disabled": true,
+      "context": "Watchlist only: tw 公告文體的標準措辭（請提前辦理，以免造成不便）；屬語域偏好而非錯誤",
+      "source": "native_lexical_trap_bubian",
+      "tags": ["src:deaitone"]
     },
     {
       "from": "以太",
@@ -756,6 +783,16 @@
       "context_clues": ["CSS", "UI", "介面", "排版", "設計"]
     },
     {
+      "from": "佈署",
+      "to": ["部署"],
+      "type": "variant",
+      "context": "MoE 標準用字為「部署」。s2t 表把「布署」轉成「佈署」，本規則收尾。exceptions 排除「公佈／宣佈」後接「署長／署理」的切分",
+      "english": "deploy",
+      "source": "native_lexical_trap_bushu_gongbu",
+      "exceptions": ["公佈署", "宣佈署", "發佈署", "頒佈署"],
+      "tags": ["src:deaitone"]
+    },
+    {
       "from": "位圖",
       "to": ["點陣圖", "位元映射", "位元圖"],
       "type": "cross_strait",
@@ -840,21 +877,24 @@
     },
     {
       "from": "作為一位",
-      "to": [""],
+      "to": [],
       "type": "translationese",
-      "context": "dewesternise.V2: 作為一位 sentence-initial calque; delete"
+      "context": "作為一位 sentence-initial calque; fold the role into the clause",
+      "tags": ["src:dewesternise"]
     },
     {
       "from": "作為一個",
-      "to": [""],
+      "to": [],
       "type": "translationese",
-      "context": "dewesternise.V2: 作為一個 sentence-initial calque; delete"
+      "context": "作為一個 sentence-initial calque; fold the role into the clause",
+      "tags": ["src:dewesternise"]
     },
     {
       "from": "作為一名",
-      "to": [""],
+      "to": [],
       "type": "translationese",
-      "context": "dewesternise.V2: 作為一名 sentence-initial calque; delete"
+      "context": "作為一名 sentence-initial calque; fold the role into the clause",
+      "tags": ["src:dewesternise"]
     },
     {
       "from": "併發",
@@ -870,6 +910,16 @@
       "type": "cross_strait",
       "context": "S2T 後形式。tw: 並行=concurrency (@seealso 並發執行, 併發)",
       "english": "concurrent execution"
+    },
+    {
+      "from": "使用者們",
+      "to": ["使用者"],
+      "type": "translationese",
+      "context": "中文不用複數標記；「們」用於人時技術文件多半可省。合法但冗贅，故標記 editorial_confidence low",
+      "english": "users",
+      "source": "ai_plural_users",
+      "tags": ["src:deaitone"],
+      "editorial_confidence": "low"
     },
     {
       "from": "使用者程序",
@@ -925,9 +975,10 @@
     },
     {
       "from": "促進",
-      "to": ["推動"],
+      "to": [],
       "type": "ai_filler",
-      "context": "writing humanizer: generic promotion verb; name the concrete mechanism"
+      "context": "generic promotion verb; name the concrete mechanism",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "保修",
@@ -1132,6 +1183,15 @@
       "to": [""],
       "type": "ai_filler",
       "context": "AI filler phrase with zero information content; delete"
+    },
+    {
+      "from": "值得我們深思",
+      "to": [],
+      "type": "ai_filler",
+      "context": "closing cliche; flag but do not auto-delete. exceptions 排除「深思熟慮」",
+      "source": "ai_filler_closing_reflection",
+      "exceptions": ["值得我們深思熟慮"],
+      "tags": ["src:deaitone"]
     },
     {
       "from": "值得注意的是",
@@ -1413,9 +1473,10 @@
     },
     {
       "from": "充滿活力",
-      "to": ["活絡"],
+      "to": [],
       "type": "ai_filler",
-      "context": "writing humanizer: stock vitality phrase; replace with observable evidence"
+      "context": "stock vitality phrase; replace with observable evidence",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "充電寶",
@@ -1672,9 +1733,10 @@
     },
     {
       "from": "全新體驗",
-      "to": [""],
+      "to": [],
       "type": "ai_filler",
-      "context": "humanize.C5: promotional cliché; delete"
+      "context": "promotional cliche; name what changed for the user",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "全棧",
@@ -1741,10 +1803,20 @@
       "english": "public land mobile network"
     },
     {
+      "from": "公域流量",
+      "to": ["公開流量", "外部流量"],
+      "type": "cross_strait",
+      "context": "@domain 商業。cn 互聯網營銷黑話；tw 用「公開流量」或「外部流量」",
+      "english": "public-domain traffic",
+      "source": "ai_lexical_marketing",
+      "tags": ["src:deaitone"]
+    },
+    {
       "from": "公開公告",
       "to": ["公告"],
       "type": "translationese",
-      "context": "dewesternise.S1: semantic overlap"
+      "context": "Semantic overlap",
+      "tags": ["src:dewesternise"]
     },
     {
       "from": "共享庫",
@@ -1757,7 +1829,8 @@
       "from": "共同協作",
       "to": ["協作"],
       "type": "translationese",
-      "context": "dewesternise.S1: semantic overlap"
+      "context": "Semantic overlap",
+      "tags": ["src:dewesternise"]
     },
     {
       "from": "兼容",
@@ -2058,6 +2131,15 @@
       "english": "marshal"
     },
     {
+      "from": "初中",
+      "to": ["國中"],
+      "type": "cross_strait",
+      "disabled": true,
+      "context": "Watchlist only: 「X初」＋「中Y」的切分陷阱是開放集合（當初中央、年初中旬、清初中國、世紀初中東），exceptions 無法窮舉",
+      "source": "native_lexical_trap_chuzhong",
+      "tags": ["src:deaitone"]
+    },
+    {
       "from": "初等矩陣",
       "to": ["基本矩陣"],
       "type": "cross_strait",
@@ -2266,8 +2348,9 @@
       "from": "助力",
       "to": [],
       "type": "ai_filler",
-      "context": "humanize.V1: AI signature word",
-      "negative_context_clues": ["得力助", "鼎力"]
+      "context": "AI signature word",
+      "negative_context_clues": ["得力助", "鼎力"],
+      "tags": ["src:humanizer"]
     },
     {
       "from": "助記符",
@@ -2483,8 +2566,9 @@
       "from": "危險性",
       "to": ["危險"],
       "type": "translationese",
-      "context": "dewesternise.V6: 性 suffix overuse",
-      "negative_context_clues": ["論文", "研究", "分析", "評估"]
+      "context": "性 suffix overuse",
+      "negative_context_clues": ["論文", "研究", "分析", "評估"],
+      "tags": ["src:dewesternise"]
     },
     {
       "from": "即插即用",
@@ -2616,8 +2700,9 @@
       "from": "反映了",
       "to": [],
       "type": "ai_filler",
-      "context": "humanize.C4: shallow analysis cliché when paired with 深層/本質",
-      "positional_clues": ["before:深層", "before:本質"]
+      "context": "Shallow analysis cliché when paired with 深層/本質",
+      "positional_clues": ["before:深層", "before:本質"],
+      "tags": ["src:humanizer"]
     },
     {
       "from": "反碼",
@@ -2659,7 +2744,8 @@
       "from": "受到各界關注",
       "to": [],
       "type": "ai_filler",
-      "context": "humanize.C3: vague attribution cliché"
+      "context": "Vague attribution cliché",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "受獎產品",
@@ -2699,16 +2785,17 @@
     },
     {
       "from": "可以看到",
-      "to": [""],
+      "to": [],
       "type": "ai_filler",
-      "context": "AI filler phrase (可以看到); delete or rephrase",
+      "context": "AI filler predicate; state what the reader should conclude",
       "context_clues": ["系統", "程式", "功能", "架構", "方法"]
     },
     {
       "from": "可以說是",
-      "to": [""],
+      "to": [],
       "type": "ai_filler",
-      "context": "humanize.V2: hedging filler"
+      "context": "hedging copula; assert or qualify concretely",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "可移動",
@@ -2722,8 +2809,9 @@
       "from": "可能性",
       "to": ["可能"],
       "type": "translationese",
-      "context": "dewesternise.V6: 性 suffix overuse",
-      "negative_context_clues": ["論文", "研究", "分析", "評估", "機率"]
+      "context": "性 suffix overuse",
+      "negative_context_clues": ["論文", "研究", "分析", "評估", "機率"],
+      "tags": ["src:dewesternise"]
     },
     {
       "from": "可行函數",
@@ -2736,8 +2824,9 @@
       "from": "可行性",
       "to": ["可行"],
       "type": "translationese",
-      "context": "dewesternise.V6: 性 suffix overuse",
-      "negative_context_clues": ["論文", "研究", "分析", "評估"]
+      "context": "性 suffix overuse",
+      "negative_context_clues": ["論文", "研究", "分析", "評估"],
+      "tags": ["src:dewesternise"]
     },
     {
       "from": "可視化",
@@ -2822,8 +2911,9 @@
       "from": "合理性",
       "to": ["合理"],
       "type": "translationese",
-      "context": "dewesternise.V6: 性 suffix overuse",
-      "negative_context_clues": ["論文", "研究", "分析", "評估"]
+      "context": "性 suffix overuse",
+      "negative_context_clues": ["論文", "研究", "分析", "評估"],
+      "tags": ["src:dewesternise"]
     },
     {
       "from": "吉布提",
@@ -2896,6 +2986,15 @@
       "english": "command line"
     },
     {
+      "from": "和／或",
+      "to": ["或"],
+      "type": "translationese",
+      "disabled": true,
+      "context": "Watchlist only: 法律與規格文件中合法；且只匹配全形 U+FF0F，ASCII 的「和/或」逸出",
+      "source": "native_lexical_trap_hehuo",
+      "tags": ["src:deaitone"]
+    },
+    {
       "from": "咖喱",
       "to": ["咖哩"],
       "type": "cross_strait",
@@ -2957,7 +3056,8 @@
       "from": "唱歌和跳舞",
       "to": ["又唱又跳"],
       "type": "translationese",
-      "context": "dewesternise.G6: 和 verb-pair calque"
+      "context": "和 verb-pair calque",
+      "tags": ["src:dewesternise"]
     },
     {
       "from": "商業模型",
@@ -3188,10 +3288,10 @@
       "from": "回頭再議",
       "to": ["後續再議", "改日再談"],
       "type": "translationese",
-      "context": "cuimao.Business: PRC meeting-minute calque of \"circle back\"; zh-TW prefers 後續再議",
+      "context": "PRC meeting-minute calque of \"circle back\"; zh-TW prefers 後續再議",
       "english": "circle back",
       "context_clues": ["會議", "討論", "提案", "議題", "回饋", "下次"],
-      "tags": ["translation_aid", "cuimao_derived", "business_terms"]
+      "tags": ["src:cuimao", "topic:business_terms"]
     },
     {
       "from": "因此我們可以看到",
@@ -3232,7 +3332,8 @@
       "from": "國家們",
       "to": [],
       "type": "translationese",
-      "context": "dewesternise.G5: 們 plural overuse on non-human noun"
+      "context": "們 plural overuse on non-human noun",
+      "tags": ["src:dewesternise"]
     },
     {
       "from": "國際象棋",
@@ -3355,17 +3456,27 @@
       "english": "potato"
     },
     {
-      "from": "在某種程度上",
-      "to": [""],
+      "from": "在一定程度上",
+      "to": [],
       "type": "ai_filler",
-      "context": "AI hedging phrase (在某種程度上); delete or be specific"
+      "context": "semantic hedge; flag but do not auto-delete, since removing it strengthens the claim (@seealso 在某種程度上)",
+      "source": "ai_filler_hedge_degree",
+      "exceptions": ["在一定程度上限"],
+      "tags": ["src:deaitone"]
+    },
+    {
+      "from": "在某種程度上",
+      "to": [],
+      "type": "ai_filler",
+      "context": "semantic hedge; flag but do not auto-delete, since removing it strengthens the claim the sentence makes"
     },
     {
       "from": "在當今",
-      "to": [""],
+      "to": [],
       "type": "ai_filler",
-      "context": "writing humanizer: era-framing opener; delete unless the era is specific",
-      "context_clues": ["時代"]
+      "context": "era-framing opener; rewrite around the specific period",
+      "context_clues": ["時代"],
+      "tags": ["src:humanizer"]
     },
     {
       "from": "在線",
@@ -3379,7 +3490,8 @@
       "from": "在這個時間點上",
       "to": ["目前", "此時"],
       "type": "ai_filler",
-      "context": "humanize.V6: wordy cliché"
+      "context": "Wordy cliché",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "在這個過程中",
@@ -3433,6 +3545,15 @@
       "exceptions": ["均值得", "均值定理", "均值不等式"]
     },
     {
+      "from": "均衡",
+      "to": [],
+      "type": "ai_filler",
+      "disabled": true,
+      "context": "Watchlist only: ordinary zh-TW for balance; only the audio EQ sense is 等化; requires native-corpus counterexamples",
+      "source": "native_sediment_and_balance",
+      "tags": ["src:deaitone"]
+    },
+    {
       "from": "坐標",
       "to": ["座標"],
       "type": "cross_strait",
@@ -3452,7 +3573,8 @@
       "from": "坐落於",
       "to": [],
       "type": "ai_filler",
-      "context": "humanize.C5: travel-brochure cliché"
+      "context": "Travel-brochure cliché",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "坦桑尼亞",
@@ -3513,9 +3635,10 @@
     },
     {
       "from": "培養",
-      "to": ["養成"],
+      "to": [],
       "type": "ai_filler",
-      "context": "writing humanizer: generic nurture verb; name the concrete practice"
+      "context": "generic nurture verb; name the concrete practice",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "基向量",
@@ -3551,6 +3674,15 @@
       "type": "cross_strait",
       "context": "@domain IT",
       "english": "message based"
+    },
+    {
+      "from": "基於現有公開資料",
+      "to": [],
+      "type": "ai_filler",
+      "disabled": true,
+      "context": "Watchlist only: ordinary zh-TW report register (\"based on publicly available data\"); a tell in an assistant's own voice, not in a research write-up. Needs native-corpus counterexamples.",
+      "source": "tests/fixtures/writing_humanizer/pattern32_bad.txt",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "基站",
@@ -3674,9 +3806,11 @@
     },
     {
       "from": "增強",
-      "to": ["加強", "提高"],
+      "to": [],
       "type": "ai_filler",
-      "context": "writing humanizer: generic uplift verb; use the concrete action"
+      "disabled": true,
+      "context": "Watchlist only: 標準臺灣技術用語; 提升命中率 and 增強穩定性 are ordinary technical zh-TW and the suggestions are no more concrete",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "增強現實",
@@ -3822,6 +3956,24 @@
       "context_clues": ["程式", "軟體", "系統", "電腦", "網路"]
     },
     {
+      "from": "大多數人都搞錯了",
+      "to": [],
+      "type": "ai_filler",
+      "context": "AI myth opener; state the concrete claim and its evidence",
+      "source": "tests/fixtures/writing_humanizer/pattern36_bad.txt",
+      "negative_context_clues": ["量測", "實測", "數據", "資料", "研究", "統計", "報告", "證據"],
+      "tags": ["src:humanizer"]
+    },
+    {
+      "from": "大家都錯了",
+      "to": [],
+      "type": "ai_filler",
+      "context": "AI contrarian opener; replace with the concrete claim",
+      "source": "tests/fixtures/writing_humanizer/pattern32_bad.txt",
+      "negative_context_clues": ["量測", "實測", "數據", "資料", "研究", "統計", "報告", "證據"],
+      "tags": ["src:humanizer"]
+    },
+    {
       "from": "大實話",
       "to": ["真心話", "實話", "真話", "人話"],
       "type": "cross_strait",
@@ -3848,6 +4000,15 @@
       "type": "cross_strait",
       "context": "@domain 數學。秦九韶《數書九章》中的同餘求解法，tw 通稱「中國剩餘定理」",
       "english": "Chinese remainder theorem"
+    },
+    {
+      "from": "大部分人都搞錯了",
+      "to": [],
+      "type": "ai_filler",
+      "context": "AI myth opener; state the concrete claim and its evidence",
+      "source": "tests/fixtures/writing_humanizer/pattern36_bad.txt",
+      "negative_context_clues": ["量測", "實測", "數據", "資料", "研究", "統計", "報告", "證據"],
+      "tags": ["src:humanizer"]
     },
     {
       "from": "大醬",
@@ -3887,17 +4048,18 @@
       "from": "套殼",
       "to": ["API 包裝", "應用程式包裝", "wrapper"],
       "type": "translationese",
-      "context": "cuimao.AI: PRC tech-blog slang for thin LLM API wrapper; zh-TW prefers descriptive 介面包裝 or English wrapper",
+      "context": "PRC tech-blog slang for thin LLM API wrapper; zh-TW prefers descriptive 介面包裝 or English wrapper",
       "english": "AI Wrapper",
       "context_clues": ["AI", "GPT", "API", "模型", "LLM", "Claude"],
-      "tags": ["translation_aid", "cuimao_derived", "ai_terms"]
+      "tags": ["src:cuimao", "topic:ai_terms"]
     },
     {
       "from": "奠定基礎",
       "to": [],
       "type": "ai_filler",
-      "context": "humanize.V1: AI signature cliché",
-      "negative_context_clues": ["地基", "建築", "水泥", "工程"]
+      "context": "AI signature cliché",
+      "negative_context_clues": ["地基", "建築", "水泥", "工程"],
+      "tags": ["src:humanizer"]
     },
     {
       "from": "奧巴馬",
@@ -3915,9 +4077,18 @@
     },
     {
       "from": "好問題",
-      "to": [""],
+      "to": [],
       "type": "ai_filler",
-      "context": "humanize.C7: sycophantic chatbot opener; delete"
+      "context": "sycophantic chatbot opener; answer without the compliment",
+      "tags": ["src:humanizer"]
+    },
+    {
+      "from": "好的，沒問題",
+      "to": [],
+      "type": "ai_filler",
+      "context": "應答式熱情開場；答不答應從做不做看得出來",
+      "source": "ai_filler_eager_assent",
+      "tags": ["src:deaitone"]
     },
     {
       "from": "如需協助請聯繫",
@@ -4116,7 +4287,8 @@
       "from": "存在著",
       "to": ["存在"],
       "type": "translationese",
-      "context": "dewesternise.V14: 存在著 existential calque"
+      "context": "存在著 existential calque",
+      "tags": ["src:dewesternise"]
     },
     {
       "from": "存盤",
@@ -4150,13 +4322,15 @@
       "from": "學習和工作",
       "to": ["學習與工作"],
       "type": "translationese",
-      "context": "dewesternise.G6: 和 overuse; prefer 與 in formal register"
+      "context": "和 overuse; prefer 與 in formal register",
+      "tags": ["src:dewesternise"]
     },
     {
       "from": "學者普遍認為",
       "to": [],
       "type": "ai_filler",
-      "context": "humanize.C3: vague attribution; name specific scholars"
+      "context": "Vague attribution; name specific scholars",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "宇航員",
@@ -4214,7 +4388,8 @@
       "from": "完美融合",
       "to": [],
       "type": "ai_filler",
-      "context": "humanize.C5: promotional cliché"
+      "context": "Promotional cliché",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "宏",
@@ -4392,9 +4567,10 @@
     },
     {
       "from": "寶貴的",
-      "to": [""],
+      "to": [],
       "type": "ai_filler",
-      "context": "writing humanizer: generic praise adjective; delete or specify the value"
+      "context": "generic praise adjective; name what the value was",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "封禁",
@@ -4402,6 +4578,15 @@
       "type": "cross_strait",
       "context": "@domain 社群",
       "english": "ban"
+    },
+    {
+      "from": "專家認為",
+      "to": [],
+      "type": "ai_filler",
+      "context": "以不具名權威口吻提出主張。同句內若已標註出處（編號、註腳、連結、網址）或已指明機構，即為正常中文，故交由 uncited_attribution 結構守衛判斷，不進入詞彙比對",
+      "source": "native_attribution_casual_numbered_citation",
+      "tags": ["src:voiceguard"],
+      "structural_guard": "uncited_attribution"
     },
     {
       "from": "尋址",
@@ -4433,6 +4618,15 @@
       "type": "cross_strait",
       "context": "@domain 程式設計",
       "english": "object model"
+    },
+    {
+      "from": "對齊",
+      "to": [],
+      "type": "ai_filler",
+      "disabled": true,
+      "context": "Watchlist only: typography and data alignment; PRC sense is reaching consensus; requires native-corpus counterexamples",
+      "source": "native_alignment_and_lead",
+      "tags": ["src:deaitone"]
     },
     {
       "from": "導入",
@@ -4630,7 +4824,8 @@
       "from": "展開調查",
       "to": ["調查"],
       "type": "translationese",
-      "context": "dewesternise.V10: weak verb + nominalization"
+      "context": "Weak verb + nominalization",
+      "tags": ["src:dewesternise"]
     },
     {
       "from": "層次結構",
@@ -4823,9 +5018,10 @@
     },
     {
       "from": "希望這對你有幫助",
-      "to": [""],
+      "to": [],
       "type": "ai_filler",
-      "context": "humanize.M1: chatbot closer; delete"
+      "context": "chatbot closer; stop at the last sentence with content",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "帕勞",
@@ -4896,7 +5092,8 @@
       "from": "年老和常常生病",
       "to": ["年老多病"],
       "type": "translationese",
-      "context": "dewesternise.G6: 和 adjective-pair calque"
+      "context": "和 adjective-pair calque",
+      "tags": ["src:dewesternise"]
     },
     {
       "from": "幺",
@@ -4944,8 +5141,9 @@
       "from": "底層邏輯",
       "to": ["邏輯", "原理"],
       "type": "ai_filler",
-      "context": "humanize.V1: AI signature phrase; prefer 邏輯/原理",
-      "negative_context_clues": ["底層架構", "底層硬體", "kernel"]
+      "context": "AI signature phrase; prefer 邏輯/原理",
+      "negative_context_clues": ["底層架構", "底層硬體", "kernel"],
+      "tags": ["src:humanizer"]
     },
     {
       "from": "底板價",
@@ -5003,7 +5201,8 @@
       "from": "廣泛被認為",
       "to": [],
       "type": "ai_filler",
-      "context": "humanize.C3: vague attribution; name the source or drop"
+      "context": "Vague attribution; name the source or drop",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "引出",
@@ -5094,6 +5293,15 @@
       "context_clues": ["程式", "軟體", "系統", "電腦", "網路"]
     },
     {
+      "from": "很可能出身於",
+      "to": [],
+      "type": "ai_filler",
+      "context": "Speculative biographical filler without evidence",
+      "source": "tests/fixtures/writing_humanizer/pattern33_bad.txt",
+      "negative_context_clues": ["://", "doi", "參見", "註"],
+      "tags": ["src:humanizer"]
+    },
+    {
       "from": "後台",
       "to": ["背景"],
       "type": "cross_strait",
@@ -5143,9 +5351,26 @@
     },
     {
       "from": "從某個角度來看",
-      "to": [""],
+      "to": [],
       "type": "ai_filler",
-      "context": "humanize.V2: hedging filler; delete"
+      "context": "semantic hedge; flag but do not auto-delete, since removing it strengthens the claim the sentence makes",
+      "tags": ["src:humanizer"]
+    },
+    {
+      "from": "從某種意義上來說",
+      "to": [],
+      "type": "ai_filler",
+      "context": "semantic hedge; flag but do not auto-delete, since removing it strengthens the claim the sentence makes",
+      "source": "ai_sense_hedge",
+      "tags": ["src:deaitone"]
+    },
+    {
+      "from": "從某種意義上說",
+      "to": [],
+      "type": "ai_filler",
+      "context": "semantic hedge; flag but do not auto-delete, since removing it strengthens the claim the sentence makes",
+      "source": "ai_sense_hedge",
+      "tags": ["src:deaitone"]
     },
     {
       "from": "從某種角度來看",
@@ -5176,6 +5401,17 @@
       "english": "second-run film"
     },
     {
+      "from": "復盤",
+      "to": ["檢討", "回顧"],
+      "type": "translationese",
+      "context": "PRC business jargon (post-mortem) overloads the board-game and trading senses",
+      "english": "review / post-mortem",
+      "source": "native_market_close_review",
+      "context_clues": ["專案", "團隊", "會議", "流程", "檢視", "經驗"],
+      "negative_context_clues": ["股票", "股市", "停牌", "開盤", "收盤", "交易", "棋局", "對局", "棋譜"],
+      "tags": ["src:deaitone", "topic:business_terms"]
+    },
+    {
       "from": "循環",
       "to": ["迴圈"],
       "type": "confusable",
@@ -5202,8 +5438,9 @@
       "from": "必要性",
       "to": ["必要"],
       "type": "translationese",
-      "context": "dewesternise.V6: 性 suffix overuse",
-      "negative_context_clues": ["論文", "研究", "分析", "評估"]
+      "context": "性 suffix overuse",
+      "negative_context_clues": ["論文", "研究", "分析", "評估"],
+      "tags": ["src:dewesternise"]
     },
     {
       "from": "志願者",
@@ -5307,9 +5544,10 @@
     },
     {
       "from": "您說得完全正確",
-      "to": [""],
+      "to": [],
       "type": "ai_filler",
-      "context": "humanize.C7: sycophantic chatbot filler; delete"
+      "context": "sycophantic chatbot filler; say what is right and why",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "情感發現",
@@ -5373,10 +5611,10 @@
       "from": "憑感覺編程",
       "to": ["Vibe Coding"],
       "type": "translationese",
-      "context": "cuimao.AI: PRC SC calque of Karpathy's coinage; zh-TW writing keeps the English term",
+      "context": "PRC SC calque of Karpathy's coinage; zh-TW writing keeps the English term",
       "english": "Vibe Coding (Karpathy)",
       "context_clues": ["Cursor", "Claude", "AI", "IDE"],
-      "tags": ["translation_aid", "cuimao_derived", "ai_terms"]
+      "tags": ["src:cuimao", "topic:ai_terms"]
     },
     {
       "from": "應用程序",
@@ -5410,7 +5648,8 @@
       "from": "成功地",
       "to": ["成功"],
       "type": "translationese",
-      "context": "dewesternise.V8: 地 adverbial calque"
+      "context": "地 adverbial calque",
+      "tags": ["src:dewesternise"]
     },
     {
       "from": "成員函數",
@@ -5436,10 +5675,11 @@
     },
     {
       "from": "我們就能明白",
-      "to": [""],
+      "to": [],
       "type": "ai_filler",
-      "context": "writing humanizer: explanatory throat-clearing; state the inference directly",
-      "context_clues": ["理解了"]
+      "context": "explanatory throat-clearing; state the inference directly",
+      "context_clues": ["理解了"],
+      "tags": ["src:humanizer"]
     },
     {
       "from": "截取",
@@ -5454,6 +5694,22 @@
       "type": "cross_strait",
       "context": "@domain 硬體",
       "english": "screenshot"
+    },
+    {
+      "from": "截至我所掌握的資訊",
+      "to": [],
+      "type": "ai_filler",
+      "context": "AI knowledge-cutoff disclaimer; state the source and date concretely instead",
+      "source": "tests/fixtures/writing_humanizer/pattern32_bad.txt",
+      "tags": ["src:humanizer"]
+    },
+    {
+      "from": "截至我的知識更新時間",
+      "to": [],
+      "type": "ai_filler",
+      "context": "assistant self-reference; no human author writes this. Flag rather than delete, since the sentence needs rewriting not truncating",
+      "source": "ai_filler_knowledge_cutoff",
+      "tags": ["src:deaitone"]
     },
     {
       "from": "戰略",
@@ -5476,6 +5732,15 @@
       "type": "cross_strait",
       "context": "@geo country (國名)",
       "english": "Solomon Islands"
+    },
+    {
+      "from": "所謂的",
+      "to": [],
+      "type": "ai_filler",
+      "context": "「所謂」與引號擇一即可，兩者並用是雙重標記。比對範圍只取「所謂的」三字，把引號含進去會讓建議刪除的區段跨過「，照著刪就剩下沒有配對的」。引號須在其後，其前不得有「：「所謂的X」是整體引用，屬正常中文",
+      "source": "ai_filler_scare_quote_socalled",
+      "positional_clues": ["before:「", "not_after:「"],
+      "tags": ["src:deaitone"]
     },
     {
       "from": "手動檔",
@@ -5524,8 +5789,9 @@
       "from": "打造",
       "to": [],
       "type": "ai_filler",
-      "context": "humanize.V1: AI signature word when abstract",
-      "negative_context_clues": ["珠寶", "首飾", "金屬", "木工", "鐵匠"]
+      "context": "AI signature word when abstract",
+      "negative_context_clues": ["珠寶", "首飾", "金屬", "木工", "鐵匠"],
+      "tags": ["src:humanizer"]
     },
     {
       "from": "打醬油",
@@ -5547,9 +5813,10 @@
       "from": "扮演",
       "to": [],
       "type": "ai_filler",
-      "context": "humanize.V3: copula-as-verb cliché when paired with 角色",
+      "context": "Copula-as-verb cliché when paired with 角色",
       "negative_context_clues": ["演員", "戲劇", "話劇", "電影", "舞台", "半導體", "產業", "技術", "核心", "系統", "架構", "平台"],
-      "positional_clues": ["before:角色"]
+      "positional_clues": ["before:角色"],
+      "tags": ["src:humanizer"]
     },
     {
       "from": "批處理",
@@ -5587,6 +5854,15 @@
       "english": "claw machine"
     },
     {
+      "from": "抓手",
+      "to": [],
+      "type": "ai_filler",
+      "disabled": true,
+      "context": "Watchlist only: PRC jargon, but the substring matches 抓手機 and 抓手臂; requires native-corpus counterexamples",
+      "source": "native_grab_the_phone",
+      "tags": ["src:deaitone"]
+    },
+    {
       "from": "抓空字",
       "to": ["抽空"],
       "type": "cross_strait",
@@ -5613,6 +5889,26 @@
       "type": "cross_strait",
       "context": "@domain 圖形",
       "english": "dithering"
+    },
+    {
+      "from": "拉新",
+      "to": ["開發新客"],
+      "type": "cross_strait",
+      "context": "@domain 商業。cn 互聯網運營黑話；tw 用「開發新客」。需同時出現成長行銷用語才成立，因此「拉新的線／新娘的手」這類字面用法不會觸發",
+      "english": "user acquisition",
+      "source": "ai_lexical_growth",
+      "context_clues": ["留存", "促活", "轉化", "增長", "私域", "運營", "漏斗", "獲客"],
+      "tags": ["src:deaitone"]
+    },
+    {
+      "from": "拉通",
+      "to": ["整合", "串接"],
+      "type": "cross_strait",
+      "context": "@domain 商業。cn 互聯網黑話；tw 用「整合」或「串接」。需同時出現行銷或組織用語才成立，因此「拉通風管／通道」這類字面用法不會觸發",
+      "english": "align across teams",
+      "source": "ai_lexical_ops",
+      "context_clues": ["對齊", "賦能", "閉環", "抓手", "顆粒度", "復盤", "打法", "部門", "團隊"],
+      "tags": ["src:deaitone"]
     },
     {
       "from": "拉黑",
@@ -5668,9 +5964,10 @@
     },
     {
       "from": "持久的",
-      "to": ["長久的"],
+      "to": [],
       "type": "ai_filler",
-      "context": "writing humanizer: inflated adjective; prefer a concrete modifier"
+      "context": "inflated adjective; prefer a concrete modifier",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "持續集成",
@@ -5767,9 +6064,10 @@
     },
     {
       "from": "接下來我們來看",
-      "to": [""],
+      "to": [],
       "type": "ai_filler",
-      "context": "writing humanizer: classroom-style transition; use a direct transition"
+      "context": "classroom-style transition; use a direct transition",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "接入覆用器",
@@ -5845,7 +6143,8 @@
       "from": "提供支援",
       "to": ["支援"],
       "type": "translationese",
-      "context": "dewesternise.V10: weak verb + nominalization"
+      "context": "Weak verb + nominalization",
+      "tags": ["src:dewesternise"]
     },
     {
       "from": "提供方",
@@ -5859,13 +6158,16 @@
       "from": "提前預告",
       "to": ["預告"],
       "type": "translationese",
-      "context": "dewesternise.S1: semantic overlap"
+      "context": "Semantic overlap",
+      "tags": ["src:dewesternise"]
     },
     {
       "from": "提升",
-      "to": ["提高", "改善"],
+      "to": [],
       "type": "ai_filler",
-      "context": "writing humanizer: generic uplift verb; use the concrete action"
+      "disabled": true,
+      "context": "Watchlist only: 標準臺灣技術用語; 提升命中率 and 增強穩定性 are ordinary technical zh-TW and the suggestions are no more concrete",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "插件",
@@ -5880,6 +6182,14 @@
       "type": "cross_strait",
       "context": "@domain 通訊",
       "english": "handshake"
+    },
+    {
+      "from": "揭示了",
+      "to": [],
+      "type": "ai_filler",
+      "context": "AI signature verb; 顯示/說明/指出 says the same thing",
+      "source": "native_reveal_and_embrace",
+      "tags": ["src:deaitone"]
     },
     {
       "from": "搜索",
@@ -5942,6 +6252,30 @@
       "english": "podcast"
     },
     {
+      "from": "擁抱改變",
+      "to": [],
+      "type": "ai_filler",
+      "context": "AI signature collocation; name what changes",
+      "source": "native_reveal_and_embrace",
+      "tags": ["src:deaitone"]
+    },
+    {
+      "from": "擁抱未來",
+      "to": [],
+      "type": "ai_filler",
+      "context": "AI signature collocation; name what changes",
+      "source": "native_reveal_and_embrace",
+      "tags": ["src:deaitone"]
+    },
+    {
+      "from": "擁抱變革",
+      "to": [],
+      "type": "ai_filler",
+      "context": "AI signature collocation; name what changes",
+      "source": "native_reveal_and_embrace",
+      "tags": ["src:deaitone"]
+    },
+    {
       "from": "操作數",
       "to": ["運算元"],
       "type": "cross_strait",
@@ -5961,6 +6295,16 @@
       "type": "cross_strait",
       "context": "@domain 作業系統",
       "english": "operating system"
+    },
+    {
+      "from": "據信",
+      "to": [],
+      "type": "ai_filler",
+      "disabled": true,
+      "context": "Watchlist only: standard zh-TW journalistic register (\"it is believed\"); its citation guard cannot fire in news prose, which carries no URL or footnote. Needs native-corpus counterexamples.",
+      "source": "tests/fixtures/writing_humanizer/pattern33_bad.txt",
+      "negative_context_clues": ["://", "doi", "參見", "註"],
+      "tags": ["src:humanizer"]
     },
     {
       "from": "擡",
@@ -6045,7 +6389,8 @@
       "from": "政府們",
       "to": [],
       "type": "translationese",
-      "context": "dewesternise.G5: 們 plural overuse on non-human noun"
+      "context": "們 plural overuse on non-human noun",
+      "tags": ["src:dewesternise"]
     },
     {
       "from": "政治避難",
@@ -6469,10 +6814,11 @@
     },
     {
       "from": "方法論",
-      "to": ["方法"],
+      "to": [],
       "type": "ai_filler",
-      "context": "humanize.V1: AI signature; prefer plain 方法 unless in philosophy context",
-      "negative_context_clues": ["哲學", "科學哲學", "認識論", "本體論", "研究"]
+      "context": "methodology and method are different words; rewrite only if the inflation is real",
+      "negative_context_clues": ["哲學", "科學哲學", "認識論", "本體論", "研究"],
+      "tags": ["src:humanizer"]
     },
     {
       "from": "旅遊局",
@@ -6502,6 +6848,15 @@
       "context": "限 IT 語境。旅行/個人日誌為正確 tw 用法",
       "english": "log",
       "context_clues": ["伺服器", "服務器", "系統", "錯誤", "除錯", "偵錯", "調試", "輸出"]
+    },
+    {
+      "from": "旨在",
+      "to": [],
+      "type": "ai_filler",
+      "disabled": true,
+      "context": "Watchlist only: ordinary zh-TW academic register, not only an AI tell; requires native-corpus counterexamples",
+      "source": "native_topic_and_purpose",
+      "tags": ["src:deaitone"]
     },
     {
       "from": "早上好",
@@ -6626,10 +6981,19 @@
       "editorial_confidence": "low"
     },
     {
+      "from": "更可怕的是：",
+      "to": [],
+      "type": "ai_filler",
+      "context": "AI colon reveal; state the concrete consequence directly rather than staging a reveal",
+      "source": "tests/fixtures/writing_humanizer/pattern35_bad.txt",
+      "tags": ["src:humanizer"]
+    },
+    {
       "from": "更好地",
       "to": ["更好"],
       "type": "translationese",
-      "context": "dewesternise.V8: 地 adverbial calque"
+      "context": "地 adverbial calque",
+      "tags": ["src:dewesternise"]
     },
     {
       "from": "更重要的是",
@@ -6638,10 +7002,27 @@
       "context": "AI transition filler phrase; delete or rephrase"
     },
     {
+      "from": "更關鍵的是",
+      "to": [""],
+      "type": "ai_filler",
+      "context": "AI transition filler phrase; delete or rephrase",
+      "source": "ai_hedge_openers",
+      "tags": ["src:deaitone"]
+    },
+    {
       "from": "書們",
       "to": [],
       "type": "translationese",
-      "context": "dewesternise.G5: 們 plural overuse on inanimate noun"
+      "context": "們 plural overuse on inanimate noun",
+      "tags": ["src:dewesternise"]
+    },
+    {
+      "from": "最妙的是：",
+      "to": [],
+      "type": "ai_filler",
+      "context": "AI colon reveal; state the useful detail directly rather than staging a reveal",
+      "source": "tests/fixtures/writing_humanizer/pattern35_bad.txt",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "最底層派生類",
@@ -6688,6 +7069,33 @@
       "english": "to be fair / honestly"
     },
     {
+      "from": "有分析認為",
+      "to": [],
+      "type": "ai_filler",
+      "context": "以不具名權威口吻提出主張。同句內若已標註出處（編號、註腳、連結、網址）或已指明機構，即為正常中文，故交由 uncited_attribution 結構守衛判斷，不進入詞彙比對",
+      "source": "native_attribution_named_agency",
+      "tags": ["src:voiceguard"],
+      "structural_guard": "uncited_attribution"
+    },
+    {
+      "from": "有報告指出",
+      "to": [],
+      "type": "ai_filler",
+      "context": "以不具名權威口吻提出主張。同句內若已標註出處（編號、註腳、連結、網址）或已指明機構，即為正常中文，故交由 uncited_attribution 結構守衛判斷，不進入詞彙比對",
+      "source": "native_attribution_financial_link",
+      "tags": ["src:voiceguard"],
+      "structural_guard": "uncited_attribution"
+    },
+    {
+      "from": "有專家指出",
+      "to": [],
+      "type": "ai_filler",
+      "context": "以不具名權威口吻提出主張。同句內若已標註出處（編號、註腳、連結、網址）或已指明機構，即為正常中文，故交由 uncited_attribution 結構守衛判斷，不進入詞彙比對",
+      "source": "native_attribution_named_university",
+      "tags": ["src:voiceguard"],
+      "structural_guard": "uncited_attribution"
+    },
+    {
       "from": "有損壓縮",
       "to": ["有失真壓縮"],
       "type": "cross_strait",
@@ -6698,7 +7106,8 @@
       "from": "有效地",
       "to": ["有效"],
       "type": "translationese",
-      "context": "dewesternise.V8: 地 adverbial calque"
+      "context": "地 adverbial calque",
+      "tags": ["src:dewesternise"]
     },
     {
       "from": "有機流量",
@@ -6725,7 +7134,17 @@
       "from": "有著",
       "to": ["有"],
       "type": "translationese",
-      "context": "dewesternise.V14: 有著 existential calque"
+      "context": "有著 existential calque",
+      "tags": ["src:dewesternise"]
+    },
+    {
+      "from": "有趣的是",
+      "to": [],
+      "type": "ai_filler",
+      "context": "空轉話語標記，與「值得一提的是」「需要注意的是」同族，刪除後語意不損。exceptions 排除「最／很／更／覺得＋有趣的是」的分裂句，以及「有趣的是非題」的切分",
+      "source": "ai_filler_interesting_aside",
+      "exceptions": ["最有趣的是", "很有趣的是", "更有趣的是", "得有趣的是", "有趣的是非"],
+      "tags": ["src:deaitone"]
     },
     {
       "from": "服務員",
@@ -6787,9 +7206,10 @@
     },
     {
       "from": "本文將",
-      "to": [""],
+      "to": [],
       "type": "ai_filler",
-      "context": "writing humanizer: meta-discourse; start with the actual claim"
+      "context": "meta-discourse; start with the actual claim",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "本科",
@@ -6808,9 +7228,19 @@
     },
     {
       "from": "本節將",
-      "to": [""],
+      "to": [],
       "type": "ai_filler",
-      "context": "writing humanizer: meta-discourse; start with the actual claim"
+      "context": "meta-discourse; start with the actual claim",
+      "tags": ["src:humanizer"]
+    },
+    {
+      "from": "本質上",
+      "to": [],
+      "type": "ai_filler",
+      "disabled": true,
+      "context": "Watchlist only: ordinary zh-TW academic adverb; requires native-corpus counterexamples",
+      "source": "tests/fixtures/writing_humanizer/pattern34_good_watchlist.txt",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "東盟",
@@ -6939,9 +7369,10 @@
       "from": "格局",
       "to": [],
       "type": "ai_filler",
-      "context": "humanize.C1: grandiose cliché when paired with 新/大/時代",
+      "context": "Grandiose cliché when paired with 新/大/時代",
       "context_clues": ["新", "大", "時代", "全新"],
-      "negative_context_clues": ["布局", "結構", "棋局", "格子"]
+      "negative_context_clues": ["布局", "結構", "棋局", "格子"],
+      "tags": ["src:humanizer"]
     },
     {
       "from": "格林納達",
@@ -7014,6 +7445,24 @@
       "type": "variant",
       "context": "MoE 標準字體 (@example 稜角、稜線)",
       "english": "edge / ridge (char variant)"
+    },
+    {
+      "from": "業內普遍認為",
+      "to": [],
+      "type": "ai_filler",
+      "context": "以不具名權威口吻提出主張。同句內若已標註出處（編號、註腳、連結、網址）或已指明機構，即為正常中文，故交由 uncited_attribution 結構守衛判斷，不進入詞彙比對",
+      "source": "native_attribution_named_agency",
+      "tags": ["src:voiceguard"],
+      "structural_guard": "uncited_attribution"
+    },
+    {
+      "from": "業界普遍認為",
+      "to": [],
+      "type": "ai_filler",
+      "context": "以不具名權威口吻提出主張。同句內若已標註出處（編號、註腳、連結、網址）或已指明機構，即為正常中文，故交由 uncited_attribution 結構守衛判斷，不進入詞彙比對",
+      "source": "native_attribution_named_bureau",
+      "tags": ["src:voiceguard"],
+      "structural_guard": "uncited_attribution"
     },
     {
       "from": "業餘活動",
@@ -7106,8 +7555,9 @@
       "from": "標誌著",
       "to": [],
       "type": "ai_filler",
-      "context": "humanize.V3: copula-as-verb cliché",
-      "negative_context_clues": ["年代", "世紀", "歷史", "時期", "里程"]
+      "context": "Copula-as-verb cliché",
+      "negative_context_clues": ["年代", "世紀", "歷史", "時期", "里程"],
+      "tags": ["src:humanizer"]
     },
     {
       "from": "標識符",
@@ -7309,7 +7759,8 @@
       "from": "正在進行中",
       "to": ["進行中"],
       "type": "translationese",
-      "context": "dewesternise.S1: semantic overlap"
+      "context": "Semantic overlap",
+      "tags": ["src:dewesternise"]
     },
     {
       "from": "正態分布",
@@ -7319,10 +7770,20 @@
       "english": "normal distribution"
     },
     {
+      "from": "此乃",
+      "to": ["這是"],
+      "type": "cross_strait",
+      "disabled": true,
+      "context": "Watchlist only: 文言用法在引文與正式文體中合法（此乃天意）；需要先有語域判斷",
+      "source": "native_lexical_trap_cinai",
+      "tags": ["src:deaitone"]
+    },
+    {
       "from": "此外",
-      "to": [""],
+      "to": [],
       "type": "ai_filler",
-      "context": "writing humanizer: overused connective; delete or replace with a concrete transition"
+      "context": "overused connective; a single one is ordinary zh-TW, so this is advice. Stacking is what the density pass reports",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "步行街",
@@ -7340,9 +7801,10 @@
     },
     {
       "from": "歷史將會記住",
-      "to": [""],
+      "to": [],
       "type": "ai_filler",
-      "context": "writing humanizer: grandiose ending; replace with evidence"
+      "context": "grandiose ending; replace with evidence",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "歸一化",
@@ -7482,9 +7944,10 @@
     },
     {
       "from": "毫無疑問",
-      "to": [""],
+      "to": [],
       "type": "ai_filler",
-      "context": "humanize.C2: hollow assertion filler; delete"
+      "context": "hollow assertion filler; assert the claim directly",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "民政局",
@@ -7508,6 +7971,15 @@
       "english": "amino acid"
     },
     {
+      "from": "水平",
+      "to": [],
+      "type": "ai_filler",
+      "disabled": true,
+      "context": "Watchlist only: horizontal; PRC sense is 水準; requires native-corpus counterexamples",
+      "source": "native_head_and_level",
+      "tags": ["src:deaitone"]
+    },
+    {
       "from": "水門汀",
       "to": ["水泥"],
       "type": "cross_strait",
@@ -7516,9 +7988,10 @@
     },
     {
       "from": "永恆的",
-      "to": ["長久的"],
+      "to": [],
       "type": "ai_filler",
-      "context": "writing humanizer: inflated adjective; prefer a concrete modifier"
+      "context": "inflated adjective; prefer a concrete modifier",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "污",
@@ -7528,11 +8001,29 @@
       "english": "pollute (char variant)"
     },
     {
+      "from": "沉澱",
+      "to": [],
+      "type": "ai_filler",
+      "disabled": true,
+      "context": "Watchlist only: chemistry and ordinary metaphor; only the business sense is jargon; requires native-corpus counterexamples",
+      "source": "native_sediment_and_balance",
+      "tags": ["src:deaitone"]
+    },
+    {
       "from": "沒可能",
       "to": ["不可能"],
       "type": "cross_strait",
       "context": "@domain 日常",
       "english": "impossible / no way"
+    },
+    {
+      "from": "沒有人告訴你的是",
+      "to": [],
+      "type": "ai_filler",
+      "context": "AI myth opener; replace with the concrete claim",
+      "source": "tests/fixtures/writing_humanizer/pattern32_bad.txt",
+      "negative_context_clues": ["量測", "實測", "數據", "資料", "研究", "統計", "報告", "證據"],
+      "tags": ["src:humanizer"]
     },
     {
       "from": "沒誰了",
@@ -7760,9 +8251,10 @@
     },
     {
       "from": "涵養",
-      "to": ["養成"],
+      "to": [],
       "type": "ai_filler",
-      "context": "writing humanizer: inflated nurture verb; name the concrete practice"
+      "context": "inflated nurture verb; name the concrete practice",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "涼菜",
@@ -7775,19 +8267,22 @@
       "from": "深入地",
       "to": ["深入"],
       "type": "translationese",
-      "context": "dewesternise.V8: 地 adverbial calque"
+      "context": "地 adverbial calque",
+      "tags": ["src:dewesternise"]
     },
     {
       "from": "深入探討",
       "to": [],
       "type": "ai_filler",
-      "context": "humanize.V1: AI signature cliché"
+      "context": "AI signature cliché",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "深刻地改變",
       "to": [],
       "type": "ai_filler",
-      "context": "humanize.C1: grandiose adverbial cliché"
+      "context": "Grandiose adverbial cliché",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "深刻影響",
@@ -7799,8 +8294,9 @@
       "from": "深厚的",
       "to": [],
       "type": "ai_filler",
-      "context": "humanize.V1: AI signature cliché when paired with 底蘊/基礎",
-      "positional_clues": ["before:底蘊", "before:基礎", "before:淵源"]
+      "context": "AI signature cliché when paired with 底蘊/基礎",
+      "positional_clues": ["before:底蘊", "before:基礎", "before:淵源"],
+      "tags": ["src:humanizer"]
     },
     {
       "from": "混合現實",
@@ -7815,6 +8311,15 @@
       "type": "cross_strait",
       "context": "@domain 日常",
       "english": "assembled / hybrid car"
+    },
+    {
+      "from": "混響",
+      "to": ["殘響"],
+      "type": "cross_strait",
+      "context": "@domain 影音",
+      "english": "reverb",
+      "source": "cn_audio_terms",
+      "tags": ["src:deaitone"]
     },
     {
       "from": "添加",
@@ -7981,10 +8486,10 @@
       "from": "潛空間",
       "to": ["潛在空間", "latent space"],
       "type": "translationese",
-      "context": "cuimao.AI: 潛空間 is PRC ML literature compression; zh-TW academic writing prefers 潛在空間 or English",
+      "context": "潛空間 is PRC ML literature compression; zh-TW academic writing prefers 潛在空間 or English",
       "english": "latent space",
       "context_clues": ["向量", "模型", "VAE", "嵌入", "編碼"],
-      "tags": ["translation_aid", "cuimao_derived", "ai_terms"],
+      "tags": ["src:cuimao", "topic:ai_terms"],
       "editorial_confidence": "low"
     },
     {
@@ -8038,9 +8543,19 @@
     },
     {
       "from": "為了實現這一目標",
-      "to": [""],
+      "to": [],
       "type": "ai_filler",
-      "context": "humanize.V6: filler; delete"
+      "context": "filler; name the goal or drop the clause",
+      "tags": ["src:humanizer"]
+    },
+    {
+      "from": "為人低調鮮少公開",
+      "to": [],
+      "type": "ai_filler",
+      "context": "Speculative biographical filler without evidence",
+      "source": "tests/fixtures/writing_humanizer/pattern33_bad.txt",
+      "negative_context_clues": ["://", "doi", "參見", "註"],
+      "tags": ["src:humanizer"]
     },
     {
       "from": "烏茲別克斯坦",
@@ -8080,15 +8595,17 @@
     },
     {
       "from": "無縫",
-      "to": [""],
+      "to": [],
       "type": "ai_filler",
-      "context": "writing humanizer: product-copy cliche; state the concrete integration"
+      "context": "product-copy cliche; state the concrete integration",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "無縫銜接",
-      "to": ["銜接"],
+      "to": [],
       "type": "ai_filler",
-      "context": "writing humanizer: product-copy cliche; state what connects"
+      "context": "product-copy cliche; state what connects",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "無繩電話",
@@ -8334,7 +8851,8 @@
       "from": "獨特魅力",
       "to": [],
       "type": "ai_filler",
-      "context": "humanize.C5: promotional cliché"
+      "context": "Promotional cliché",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "獲得者",
@@ -8381,10 +8899,11 @@
     },
     {
       "from": "理解了",
-      "to": [""],
+      "to": [],
       "type": "ai_filler",
-      "context": "writing humanizer: explanatory throat-clearing; state the inference directly",
-      "context_clues": ["我們就能明白"]
+      "context": "explanatory throat-clearing; state the inference directly",
+      "context_clues": ["我們就能明白"],
+      "tags": ["src:humanizer"]
     },
     {
       "from": "瑙魯",
@@ -8425,10 +8944,11 @@
     },
     {
       "from": "生態系統",
-      "to": ["生態"],
+      "to": [],
       "type": "ai_filler",
-      "context": "humanize.V1: AI signature when used metaphorically for non-biological systems",
-      "negative_context_clues": ["生物", "動物", "植物", "森林", "海洋", "物種", "棲地"]
+      "context": "AI signature when used metaphorically for non-biological systems",
+      "negative_context_clues": ["生物", "動物", "植物", "森林", "海洋", "物種", "棲地"],
+      "tags": ["src:humanizer"]
     },
     {
       "from": "生物標誌物",
@@ -8491,8 +9011,18 @@
       "from": "由於",
       "to": [],
       "type": "translationese",
-      "context": "dewesternise.V1: 由於...的原因 calque",
-      "positional_clues": ["before:的原因"]
+      "context": "由於...的原因 calque",
+      "positional_clues": ["before:的原因"],
+      "tags": ["src:dewesternise"]
+    },
+    {
+      "from": "由於資訊有限",
+      "to": [],
+      "type": "ai_filler",
+      "disabled": true,
+      "context": "Watchlist only: ordinary zh-TW report register (\"given the limited information\"); a tell in an assistant's own voice, not in a research write-up. Needs native-corpus counterexamples.",
+      "source": "tests/fixtures/writing_humanizer/pattern32_bad.txt",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "界面",
@@ -8519,9 +9049,10 @@
     },
     {
       "from": "畫卷",
-      "to": [""],
+      "to": [],
       "type": "ai_filler",
-      "context": "writing humanizer: ornate stock metaphor; delete or use a concrete noun"
+      "context": "ornate stock metaphor; use a concrete noun",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "異常",
@@ -8567,9 +9098,10 @@
       "from": "當",
       "to": [],
       "type": "translationese",
-      "context": "dewesternise.G7: 當...的時候 calque; drop 當 or 的時候",
+      "context": "當...的時候 calque; drop 當 or 的時候",
       "negative_context_clues": ["每當", "正當", "適當", "便當"],
-      "positional_clues": ["before:的時候"]
+      "positional_clues": ["before:的時候"],
+      "tags": ["src:dewesternise"]
     },
     {
       "from": "當且僅當",
@@ -8588,10 +9120,11 @@
     },
     {
       "from": "當然可以",
-      "to": [""],
+      "to": [],
       "type": "ai_filler",
-      "context": "humanize.M1: sycophantic chatbot opener; delete",
-      "negative_context_clues": ["當然可以，", "當然可以。"]
+      "context": "sycophantic chatbot opener; the answer shows the agreement",
+      "negative_context_clues": ["當然可以，", "當然可以。"],
+      "tags": ["src:humanizer"]
     },
     {
       "from": "疊代",
@@ -8613,6 +9146,15 @@
       "type": "cross_strait",
       "context": "@domain IT",
       "english": "troubleshooting"
+    },
+    {
+      "from": "痛點",
+      "to": [],
+      "type": "ai_filler",
+      "disabled": true,
+      "context": "Watchlist only: ordinary zh-TW business vocabulary; requires native-corpus counterexamples",
+      "source": "tests/fixtures/writing_humanizer/pattern34_good_watchlist.txt",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "痹",
@@ -8773,13 +9315,15 @@
       "from": "相互交流",
       "to": ["交流"],
       "type": "translationese",
-      "context": "dewesternise.S1: semantic overlap"
+      "context": "Semantic overlap",
+      "tags": ["src:dewesternise"]
     },
     {
       "from": "相互作用",
-      "to": ["互相影響"],
+      "to": [],
       "type": "ai_filler",
-      "context": "writing humanizer: abstract interaction phrase; name the causal direction"
+      "context": "abstract interaction phrase; name the causal direction",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "相冊",
@@ -8790,9 +9334,10 @@
     },
     {
       "from": "相對而言",
-      "to": [""],
+      "to": [],
       "type": "ai_filler",
-      "context": "humanize.V2: hedging filler"
+      "context": "semantic hedge; flag but do not auto-delete, since removing it strengthens the claim the sentence makes",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "相抵",
@@ -8803,12 +9348,21 @@
       "context_clues": ["矩陣", "線性", "列運算", "行變換", "秩"]
     },
     {
+      "from": "相關數據表明",
+      "to": [],
+      "type": "ai_filler",
+      "context": "以不具名權威口吻提出主張。同句內若已標註出處（編號、註腳、連結、網址）或已指明機構，即為正常中文，故交由 uncited_attribution 結構守衛判斷，不進入詞彙比對",
+      "source": "native_attribution_named_institute",
+      "tags": ["src:voiceguard"],
+      "structural_guard": "uncited_attribution"
+    },
+    {
       "from": "真就是",
       "to": ["根本", "簡直"],
       "type": "translationese",
-      "context": "cuimao.FalseFriends: PRC modern slang intensifier (literally); zh-TW prefers 簡直",
+      "context": "PRC modern slang intensifier (literally); zh-TW prefers 簡直",
       "english": "literally (colloquial)",
-      "tags": ["translation_aid", "cuimao_derived", "false_friends"]
+      "tags": ["src:cuimao", "topic:false_friends"]
     },
     {
       "from": "真陰性",
@@ -8820,9 +9374,10 @@
     },
     {
       "from": "眾所周知",
-      "to": [""],
+      "to": [],
       "type": "ai_filler",
-      "context": "writing humanizer: unsupported common-knowledge marker; cite or delete"
+      "context": "unsupported common-knowledge marker; cite the source",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "着",
@@ -8870,10 +9425,10 @@
       "from": "短期見效的事",
       "to": ["唾手可得的成果", "low-hanging fruit"],
       "type": "translationese",
-      "context": "cuimao.Business: PRC consulting-deck phrasing; zh-TW prefers idiom 唾手可得 or English",
+      "context": "PRC consulting-deck phrasing; zh-TW prefers idiom 唾手可得 or English",
       "english": "low-hanging fruit",
       "context_clues": ["策略", "目標", "優先", "業務", "任務", "團隊"],
-      "tags": ["translation_aid", "cuimao_derived", "business_terms"]
+      "tags": ["src:cuimao", "topic:business_terms"]
     },
     {
       "from": "研究生院",
@@ -8881,6 +9436,24 @@
       "type": "cross_strait",
       "context": "@domain 教育",
       "english": "graduate school"
+    },
+    {
+      "from": "研究表明",
+      "to": [],
+      "type": "ai_filler",
+      "context": "以不具名權威口吻提出主張。同句內若已標註出處（編號、註腳、連結、網址）或已指明機構，即為正常中文，故交由 uncited_attribution 結構守衛判斷，不進入詞彙比對",
+      "source": "native_attribution_technical_footnote",
+      "tags": ["src:voiceguard"],
+      "structural_guard": "uncited_attribution"
+    },
+    {
+      "from": "研究顯示",
+      "to": [],
+      "type": "ai_filler",
+      "context": "以不具名權威口吻提出主張。同句內若已標註出處（編號、註腳、連結、網址）或已指明機構，即為正常中文，故交由 uncited_attribution 結構守衛判斷，不進入詞彙比對",
+      "source": "native_attribution_trailing_citation",
+      "tags": ["src:voiceguard"],
+      "structural_guard": "uncited_attribution"
     },
     {
       "from": "破壁機",
@@ -9017,6 +9590,16 @@
       "context": "@domain 社群",
       "english": "direct message / DM",
       "context_clues": ["訊息", "發送", "聊天", "好友"]
+    },
+    {
+      "from": "私域流量",
+      "to": ["自有客群", "自有流量"],
+      "type": "cross_strait",
+      "context": "@domain 商業。cn 互聯網營銷黑話；tw 用「自有客群」。exceptions 排除「隱私＋域流量」的切分",
+      "english": "private-domain traffic",
+      "source": "native_lexical_trap_siyu",
+      "exceptions": ["隱私域流量"],
+      "tags": ["src:deaitone"]
     },
     {
       "from": "科摩羅",
@@ -9391,6 +9974,15 @@
       "english": "stove (char variant)"
     },
     {
+      "from": "立馬",
+      "to": ["馬上"],
+      "type": "cross_strait",
+      "context": "@domain 日常",
+      "english": "right away",
+      "source": "cn_colloquial_mic",
+      "tags": ["src:deaitone"]
+    },
+    {
       "from": "站著說話不腰疼",
       "to": ["風涼話", "高談闊論"],
       "type": "cross_strait",
@@ -9537,6 +10129,16 @@
       "type": "cross_strait",
       "context": "@domain 程式設計。tw 學術界標準譯法；「典範」源自孔恩 (Thomas Kuhn)《科學革命的結構》中文譯本用語",
       "english": "paradigm shift"
+    },
+    {
+      "from": "簡歷",
+      "to": ["履歷"],
+      "type": "cross_strait",
+      "context": "@domain 商業。cn: 簡歷, tw: 履歷。exceptions 排除「精簡／化簡」接「歷史／歷程」的切分",
+      "english": "resume",
+      "source": "ai_lexical_hr",
+      "exceptions": ["精簡歷", "化簡歷", "縮簡歷", "刪簡歷", "從簡歷", "簡簡歷", "簡歷史", "簡歷程", "簡歷年", "簡歷代"],
+      "tags": ["src:deaitone"]
     },
     {
       "from": "粘貼",
@@ -9703,14 +10305,16 @@
       "from": "結構性變化",
       "to": [],
       "type": "ai_filler",
-      "context": "humanize.C4: vague analysis cliché",
-      "negative_context_clues": ["經濟", "人口", "產業"]
+      "context": "Vague analysis cliché",
+      "negative_context_clues": ["經濟", "人口", "產業"],
+      "tags": ["src:humanizer"]
     },
     {
       "from": "給予協助",
       "to": ["協助"],
       "type": "translationese",
-      "context": "dewesternise.V10: weak verb + nominalization"
+      "context": "Weak verb + nominalization",
+      "tags": ["src:dewesternise"]
     },
     {
       "from": "統一意見",
@@ -9738,7 +10342,8 @@
       "from": "綜上所述",
       "to": [""],
       "type": "ai_filler",
-      "context": "humanize.C2: hollow summary filler; delete"
+      "context": "Hollow summary filler; delete",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "綜合徵",
@@ -9755,11 +10360,22 @@
       "english": "green / organic food"
     },
     {
+      "from": "綫",
+      "to": ["線"],
+      "type": "variant",
+      "context": "MoE 標準字體：「綫」為異體，正體作「線」",
+      "english": "line / thread",
+      "source": "tests/fixtures/variant/moe_variant_forms.txt",
+      "tags": ["src:deaitone"]
+    },
+    {
       "from": "維度",
       "to": [],
       "type": "ai_filler",
-      "context": "humanize.V1: AI signature word; prefer 面向/層面",
-      "negative_context_clues": ["向量", "矩陣", "tensor", "張量", "座標"]
+      "context": "AI signature word when it elevates nothing; prefer 面向/層面. A real enumerated list of scoring axes is not the tell",
+      "source": "native_scoring_dimensions",
+      "negative_context_clues": ["向量", "矩陣", "tensor", "張量", "座標", "評分", "評量", "問卷", "指標", "量表", "面向", "評估", "計分"],
+      "tags": ["src:humanizer"]
     },
     {
       "from": "網上鄰居",
@@ -9827,6 +10443,15 @@
       "type": "cross_strait",
       "context": "@domain 網路",
       "english": "network adapter"
+    },
+    {
+      "from": "網課",
+      "to": ["線上課程"],
+      "type": "cross_strait",
+      "context": "@domain 教育",
+      "english": "online course",
+      "source": "cn_av_and_course",
+      "tags": ["src:deaitone"]
     },
     {
       "from": "網路棧",
@@ -9956,9 +10581,10 @@
     },
     {
       "from": "織錦",
-      "to": [""],
+      "to": [],
       "type": "ai_filler",
-      "context": "writing humanizer: ornate stock metaphor; delete or use a concrete noun"
+      "context": "ornate stock metaphor; use a concrete noun",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "繮",
@@ -9971,7 +10597,8 @@
       "from": "繼續延續",
       "to": ["延續"],
       "type": "translationese",
-      "context": "dewesternise.S1: semantic overlap"
+      "context": "Semantic overlap",
+      "tags": ["src:dewesternise"]
     },
     {
       "from": "纔",
@@ -10221,10 +10848,10 @@
       "from": "能動性",
       "to": ["行動主體性", "施動性", "agency"],
       "type": "translationese",
-      "context": "cuimao.Philosophy: PRC translation of philosophical Agency; zh-TW philosophy prefers 行動主體性 or 施動性",
+      "context": "PRC translation of philosophical Agency; zh-TW philosophy prefers 行動主體性 or 施動性",
       "english": "agency",
       "context_clues": ["哲學", "主體", "行動", "意志", "理性", "倫理"],
-      "tags": ["translation_aid", "cuimao_derived", "philosophy_terms"],
+      "tags": ["src:cuimao", "topic:philosophy_terms"],
       "editorial_confidence": "low"
     },
     {
@@ -10336,14 +10963,16 @@
       "from": "至關重要",
       "to": [],
       "type": "ai_filler",
-      "context": "humanize.V1: AI signature cliché"
+      "context": "AI signature cliché",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "致力於",
       "to": [],
       "type": "ai_filler",
-      "context": "humanize.V1: AI signature cliché",
-      "negative_context_clues": ["公益", "研發", "教育", "永續", "服務", "慈善"]
+      "context": "AI signature cliché",
+      "negative_context_clues": ["公益", "研發", "教育", "永續", "服務", "慈善"],
+      "tags": ["src:humanizer"]
     },
     {
       "from": "臺式機",
@@ -10363,8 +10992,9 @@
       "from": "舉足輕重",
       "to": [],
       "type": "ai_filler",
-      "context": "humanize.C1: grandiose cliché; rewrite as plain importance claim",
-      "negative_context_clues": ["輕重緩急"]
+      "context": "Grandiose cliché; rewrite as plain importance claim",
+      "negative_context_clues": ["輕重緩急"],
+      "tags": ["src:humanizer"]
     },
     {
       "from": "航天",
@@ -10518,11 +11148,11 @@
       "from": "落地",
       "to": ["實際應用", "導入實務"],
       "type": "translationese",
-      "context": "cuimao.AI: PRC tech-jargon sense (deploy / put into practice) overloads the literal sense (land/fall). Flag only in AI/business context; suppress when surrounding text is about flight or physical landing.",
+      "context": "PRC tech-jargon sense (deploy / put into practice) overloads the literal sense (land/fall). Flag only in AI/business context; suppress when surrounding text is about flight or physical landing.",
       "english": "ground / put into practice",
       "context_clues": ["AI", "技術", "解決方案", "場景", "業務", "部署", "產品", "應用"],
       "negative_context_clues": ["飛機", "降落", "墜落", "跑道", "機場", "戰機", "客機", "物品", "掉落", "摔"],
-      "tags": ["translation_aid", "cuimao_derived", "ai_terms"],
+      "tags": ["src:cuimao", "topic:ai_terms"],
       "editorial_confidence": "low"
     },
     {
@@ -10543,8 +11173,9 @@
       "from": "蓬勃發展",
       "to": [],
       "type": "ai_filler",
-      "context": "humanize.C5: promotional cliché",
-      "negative_context_clues": ["產業", "經濟", "市場"]
+      "context": "Promotional cliché",
+      "negative_context_clues": ["產業", "經濟", "市場"],
+      "tags": ["src:humanizer"]
     },
     {
       "from": "蔘",
@@ -10578,8 +11209,9 @@
       "from": "藝術性",
       "to": ["藝術"],
       "type": "translationese",
-      "context": "dewesternise.V6: 性 suffix overuse",
-      "negative_context_clues": ["論文", "研究", "分析", "評估"]
+      "context": "性 suffix overuse",
+      "negative_context_clues": ["論文", "研究", "分析", "評估"],
+      "tags": ["src:dewesternise"]
     },
     {
       "from": "蘇裡南",
@@ -10735,40 +11367,46 @@
       "from": "被廣泛認為",
       "to": [],
       "type": "translationese",
-      "context": "dewesternise.G1: passive + vague attribution; rewrite as 大家普遍認為/公認"
+      "context": "Passive + vague attribution; rewrite as 大家普遍認為/公認",
+      "tags": ["src:dewesternise"]
     },
     {
       "from": "被指出",
       "to": [],
       "type": "translationese",
-      "context": "dewesternise.G1: passive voice; prefer 有人指出"
+      "context": "Passive voice; prefer 有人指出",
+      "tags": ["src:dewesternise"]
     },
     {
       "from": "被稱為",
       "to": [],
       "type": "translationese",
-      "context": "dewesternise.G1: passive voice; prefer 人稱/叫做",
-      "context_clues": ["廣泛", "普遍", "一般", "一致", "常"]
+      "context": "Passive voice; prefer 人稱/叫做",
+      "context_clues": ["廣泛", "普遍", "一般", "一致", "常"],
+      "tags": ["src:dewesternise"]
     },
     {
       "from": "被視為",
       "to": [],
       "type": "translationese",
-      "context": "dewesternise.G1: passive voice; prefer 當作/看成",
-      "context_clues": ["廣泛", "普遍", "一般", "一致", "常"]
+      "context": "Passive voice; prefer 當作/看成",
+      "context_clues": ["廣泛", "普遍", "一般", "一致", "常"],
+      "tags": ["src:dewesternise"]
     },
     {
       "from": "被認為",
       "to": [],
       "type": "translationese",
-      "context": "dewesternise.G1: passive voice; rewrite as 大家認為/公認",
-      "context_clues": ["廣泛", "普遍", "一般", "一致", "常"]
+      "context": "Passive voice; rewrite as 大家認為/公認",
+      "context_clues": ["廣泛", "普遍", "一般", "一致", "常"],
+      "tags": ["src:dewesternise"]
     },
     {
       "from": "被譽為",
       "to": [],
       "type": "ai_filler",
-      "context": "humanize.C3: vague attribution cliché"
+      "context": "Vague attribution cliché",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "被重載的操作符",
@@ -10957,6 +11595,15 @@
       "type": "cross_strait",
       "context": "@domain 通訊",
       "english": "video phone"
+    },
+    {
+      "from": "觀察者指出",
+      "to": [],
+      "type": "ai_filler",
+      "context": "以不具名權威口吻提出主張。同句內若已標註出處（編號、註腳、連結、網址）或已指明機構，即為正常中文，故交由 uncited_attribution 結構守衛判斷，不進入詞彙比對",
+      "source": "native_attribution_named_university",
+      "tags": ["src:voiceguard"],
+      "structural_guard": "uncited_attribution"
     },
     {
       "from": "解壓",
@@ -11157,15 +11804,17 @@
     },
     {
       "from": "許多學者認為",
-      "to": [""],
+      "to": [],
       "type": "ai_filler",
-      "context": "humanize.C3: vague attribution; name specific scholars"
+      "context": "vague attribution; name specific scholars",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "許多專家認為",
-      "to": [""],
+      "to": [],
       "type": "ai_filler",
-      "context": "humanize.C3: vague attribution; name specific experts"
+      "context": "vague attribution; name specific experts",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "註冊機",
@@ -11212,13 +11861,23 @@
       "english": "phrase"
     },
     {
+      "from": "話筒",
+      "to": ["麥克風"],
+      "type": "cross_strait",
+      "context": "@domain 影音。tw 話筒 is the handset of a telephone, not a microphone",
+      "english": "microphone",
+      "source": "native_telephone_handset",
+      "negative_context_clues": ["電話", "聽筒", "話機", "撥號", "話務", "分機"],
+      "tags": ["src:deaitone"]
+    },
+    {
       "from": "認識論",
       "to": ["知識論", "epistemology"],
       "type": "translationese",
-      "context": "cuimao.Philosophy: tw 哲學系所通用 知識論；cn 學界用 認識論。在哲學脈絡下建議改用 知識論 或英文",
+      "context": "tw 哲學系所通用 知識論；cn 學界用 認識論。在哲學脈絡下建議改用 知識論 或英文",
       "english": "epistemology",
       "context_clues": ["哲學", "Kant", "康德", "Hume", "休謨", "經驗論", "理性論", "知識"],
-      "tags": ["translation_aid", "cuimao_derived", "philosophy_terms"],
+      "tags": ["src:cuimao", "topic:philosophy_terms"],
       "editorial_confidence": "low"
     },
     {
@@ -11256,9 +11915,9 @@
       "from": "說白了",
       "to": ["說到底", "歸根究底"],
       "type": "translationese",
-      "context": "cuimao.FalseFriends: PRC colloquial discourse marker (basically); zh-TW formal/informal both use 說到底 or 歸根究底",
+      "context": "PRC colloquial discourse marker (basically); zh-TW formal/informal both use 說到底 or 歸根究底",
       "english": "basically (colloquial)",
-      "tags": ["translation_aid", "cuimao_derived", "false_friends"]
+      "tags": ["src:cuimao", "topic:false_friends"]
     },
     {
       "from": "課時工資",
@@ -11266,6 +11925,15 @@
       "type": "cross_strait",
       "context": "@domain 教育",
       "english": "hourly pay"
+    },
+    {
+      "from": "課題",
+      "to": [],
+      "type": "ai_filler",
+      "disabled": true,
+      "context": "Watchlist only: ordinary zh-TW for an issue; PRC sense is a research project; requires native-corpus counterexamples",
+      "source": "native_topic_and_purpose",
+      "tags": ["src:deaitone"]
     },
     {
       "from": "調制解調器",
@@ -11348,6 +12016,24 @@
       "english": "debugger"
     },
     {
+      "from": "調音台",
+      "to": ["混音台"],
+      "type": "cross_strait",
+      "context": "@domain 影音",
+      "english": "mixing console",
+      "source": "cn_audio_terms",
+      "tags": ["src:deaitone"]
+    },
+    {
+      "from": "調音臺",
+      "to": ["混音台"],
+      "type": "cross_strait",
+      "context": "@domain 影音",
+      "english": "mixing console",
+      "source": "cn_audio_terms",
+      "tags": ["src:deaitone"]
+    },
+    {
       "from": "請勿追蹤",
       "to": ["停止追蹤"],
       "type": "cross_strait",
@@ -11408,21 +12094,34 @@
     },
     {
       "from": "讓我來為你",
-      "to": [""],
+      "to": [],
       "type": "ai_filler",
-      "context": "humanize.M1: chatbot opener; delete"
+      "context": "chatbot opener; start with the content",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "讓我們都能",
-      "to": [""],
+      "to": [],
       "type": "ai_filler",
-      "context": "writing humanizer: sublimating ending; replace with a concrete conclusion"
+      "context": "sublimating ending; replace with a concrete conclusion",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "豐富的文化底蘊",
       "to": [],
       "type": "ai_filler",
-      "context": "humanize.C5: promotional cliché"
+      "context": "Promotional cliché",
+      "tags": ["src:humanizer"]
+    },
+    {
+      "from": "貓膩",
+      "to": ["內情", "蹊蹺"],
+      "type": "cross_strait",
+      "context": "@domain 日常。cn 口語；exceptions 排除「貓＋膩在」（膩＝依偎）",
+      "english": "something fishy",
+      "source": "ai_lexical_colloquial",
+      "exceptions": ["貓膩在"],
+      "tags": ["src:deaitone"]
     },
     {
       "from": "貝寧",
@@ -11500,9 +12199,10 @@
     },
     {
       "from": "賦予力量",
-      "to": ["支持"],
+      "to": [],
       "type": "ai_filler",
-      "context": "writing humanizer: empowerment calque; name the concrete support"
+      "context": "empowerment calque; name the concrete support",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "賦值",
@@ -11523,7 +12223,17 @@
       "from": "賦能",
       "to": [],
       "type": "ai_filler",
-      "context": "humanize.V1: AI signature word (empower/enable)"
+      "context": "AI signature word (empower/enable)",
+      "tags": ["src:humanizer"]
+    },
+    {
+      "from": "質的飛躍",
+      "to": [],
+      "type": "ai_filler",
+      "disabled": true,
+      "context": "Watchlist only: requires native-corpus counterexamples",
+      "source": "tests/fixtures/writing_humanizer/pattern34_good_watchlist.txt",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "質量",
@@ -11568,6 +12278,17 @@
       "context": "@domain 電商",
       "english": "shopping basket",
       "context_clues": ["商品", "結帳", "訂單"]
+    },
+    {
+      "from": "賽道",
+      "to": ["領域", "市場"],
+      "type": "translationese",
+      "context": "PRC business jargon (market segment) overloads the literal racetrack sense",
+      "english": "race track / market segment",
+      "source": "native_race_track",
+      "context_clues": ["創業", "市場", "投資", "產業", "布局", "新興", "融資", "競爭"],
+      "negative_context_clues": ["賽車", "跑道", "田徑", "賽事", "車手", "選手", "自行車", "方程式", "場地"],
+      "tags": ["src:deaitone", "topic:business_terms"]
     },
     {
       "from": "贊比亞",
@@ -11829,20 +12550,42 @@
       "from": "透過",
       "to": ["藉由", "經由"],
       "type": "translationese",
-      "context": "dewesternise.V3: 透過 used with abstract means — prefer 藉由/經由",
-      "negative_context_clues": ["玻璃", "縫隙", "窗戶", "屏幕", "布料", "紗窗", "驗證", "系統", "連結", "介面", "API", "機制", "網路"]
+      "context": "透過 used with abstract means — prefer 藉由/經由",
+      "negative_context_clues": ["玻璃", "縫隙", "窗戶", "屏幕", "布料", "紗窗", "驗證", "系統", "連結", "介面", "API", "機制", "網路"],
+      "tags": ["src:dewesternise"],
+      "editorial_confidence": "low"
     },
     {
       "from": "這一現象的背後",
       "to": [],
       "type": "ai_filler",
-      "context": "humanize.C4: shallow analysis cliché"
+      "context": "Shallow analysis cliché",
+      "tags": ["src:humanizer"]
+    },
+    {
+      "from": "這是 90% 的人忽略的",
+      "to": [],
+      "type": "ai_filler",
+      "context": "AI myth opener; state the concrete claim and its evidence",
+      "source": "tests/fixtures/writing_humanizer/pattern36_bad.txt",
+      "negative_context_clues": ["量測", "實測", "數據", "資料", "研究", "統計", "報告", "證據"],
+      "tags": ["src:humanizer"]
+    },
+    {
+      "from": "這是90%的人忽略的",
+      "to": [],
+      "type": "ai_filler",
+      "context": "AI myth opener; state the concrete claim and its evidence",
+      "source": "tests/fixtures/writing_humanizer/pattern36_bad.txt",
+      "negative_context_clues": ["量測", "實測", "數據", "資料", "研究", "統計", "報告", "證據"],
+      "tags": ["src:humanizer"]
     },
     {
       "from": "這樣一個",
       "to": ["這麼"],
       "type": "translationese",
-      "context": "dewesternise.V9: 這樣一個 redundancy; replace with 這麼"
+      "context": "這樣一個 redundancy; replace with 這麼",
+      "tags": ["src:dewesternise"]
     },
     {
       "from": "通信",
@@ -12240,9 +12983,10 @@
       "from": "里程碑",
       "to": [],
       "type": "ai_filler",
-      "context": "humanize.C1: grandiose cliché; avoid unless literal milestone marker",
+      "context": "Grandiose cliché; avoid unless literal milestone marker",
       "context_clues": ["重大", "歷史", "時代", "劃時代"],
-      "negative_context_clues": ["公里", "路碑", "石碑", "專案", "專案管理", "版本"]
+      "negative_context_clues": ["公里", "路碑", "石碑", "專案", "專案管理", "版本"],
+      "tags": ["src:humanizer"]
     },
     {
       "from": "重命名",
@@ -12284,8 +13028,9 @@
       "from": "重視度",
       "to": ["重視"],
       "type": "translationese",
-      "context": "dewesternise.S2: scientific calque",
-      "negative_context_clues": ["論文", "研究", "分析", "評估"]
+      "context": "Scientific calque",
+      "negative_context_clues": ["論文", "研究", "分析", "評估"],
+      "tags": ["src:dewesternise"]
     },
     {
       "from": "重載",
@@ -12360,9 +13105,10 @@
     },
     {
       "from": "錯綜複雜",
-      "to": ["複雜"],
+      "to": [],
       "type": "ai_filler",
-      "context": "writing humanizer: inflated complexity phrase; specify the conflict"
+      "context": "inflated complexity phrase; specify the conflict",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "錯誤信息",
@@ -12482,6 +13228,15 @@
       "english": "flash memory"
     },
     {
+      "from": "閉環",
+      "to": [],
+      "type": "ai_filler",
+      "disabled": true,
+      "context": "Watchlist only: requires native-corpus counterexamples",
+      "source": "tests/fixtures/writing_humanizer/pattern34_good_watchlist.txt",
+      "tags": ["src:humanizer"]
+    },
+    {
       "from": "開始菜單",
       "to": ["開始功能表"],
       "type": "cross_strait",
@@ -12545,8 +13300,18 @@
       "from": "關注程度",
       "to": ["關注"],
       "type": "translationese",
-      "context": "dewesternise.S2: scientific calque",
-      "negative_context_clues": ["論文", "研究", "分析", "評估"]
+      "context": "Scientific calque",
+      "negative_context_clues": ["論文", "研究", "分析", "評估"],
+      "tags": ["src:dewesternise"]
+    },
+    {
+      "from": "關鍵在於：",
+      "to": [],
+      "type": "ai_filler",
+      "disabled": true,
+      "context": "Watchlist only: a colon after 關鍵在於 ordinarily introduces the answer in technical zh-TW. Needs a second signal, or native-corpus counterexamples.",
+      "source": "tests/fixtures/writing_humanizer/pattern35_bad.txt",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "阿司匹林",
@@ -12637,10 +13402,11 @@
     },
     {
       "from": "隨著",
-      "to": [""],
+      "to": [],
       "type": "ai_filler",
-      "context": "writing humanizer: boilerplate development opener; rewrite as the actual cause",
-      "context_clues": ["快速發展"]
+      "context": "boilerplate development opener; rewrite as the actual cause",
+      "context_clues": ["快速發展"],
+      "tags": ["src:humanizer"]
     },
     {
       "from": "隱式語義索引",
@@ -12914,9 +13680,10 @@
     },
     {
       "from": "非常棒的觀點",
-      "to": [""],
+      "to": [],
       "type": "ai_filler",
-      "context": "humanize.C7: sycophantic chatbot filler; delete"
+      "context": "sycophantic chatbot filler; respond to the point instead",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "面向對象",
@@ -12945,6 +13712,15 @@
       "type": "cross_strait",
       "context": "@domain 硬體。口語/日常 vs 技術文件/規格",
       "english": "speaker"
+    },
+    {
+      "from": "音視頻",
+      "to": ["影音"],
+      "type": "cross_strait",
+      "context": "@domain 影音",
+      "english": "audio and video",
+      "source": "cn_av_and_course",
+      "tags": ["src:deaitone"]
     },
     {
       "from": "音頻",
@@ -13019,7 +13795,8 @@
       "from": "預先準備",
       "to": ["準備"],
       "type": "translationese",
-      "context": "dewesternise.S1: semantic overlap"
+      "context": "Semantic overlap",
+      "tags": ["src:dewesternise"]
     },
     {
       "from": "預分配",
@@ -13035,6 +13812,15 @@
       "type": "cross_strait",
       "context": "@domain 作業系統",
       "english": "preprocessor"
+    },
+    {
+      "from": "領導",
+      "to": [],
+      "type": "ai_filler",
+      "disabled": true,
+      "context": "Watchlist only: the verb is ordinary zh-TW; only the noun sense means 主管; requires native-corpus counterexamples",
+      "source": "native_alignment_and_lead",
+      "tags": ["src:deaitone"]
     },
     {
       "from": "頭",
@@ -13068,6 +13854,15 @@
       "english": "brainstorming"
     },
     {
+      "from": "頭部",
+      "to": [],
+      "type": "ai_filler",
+      "disabled": true,
+      "context": "Watchlist only: body part; PRC sense is market-leading; requires native-corpus counterexamples",
+      "source": "native_head_and_level",
+      "tags": ["src:deaitone"]
+    },
+    {
       "from": "頻分多址",
       "to": ["分頻多重進接"],
       "type": "cross_strait",
@@ -13082,19 +13877,29 @@
       "english": "frequency-division multiplexing (FDM)"
     },
     {
-      "from": "願我們",
-      "to": [""],
+      "from": "顆粒度",
+      "to": [],
       "type": "ai_filler",
-      "context": "writing humanizer: sublimating ending; replace with a concrete conclusion"
+      "disabled": true,
+      "context": "Watchlist only: requires native-corpus counterexamples",
+      "source": "tests/fixtures/writing_humanizer/pattern34_good_watchlist.txt",
+      "tags": ["src:humanizer"]
+    },
+    {
+      "from": "願我們",
+      "to": [],
+      "type": "ai_filler",
+      "context": "sublimating ending; replace with a concrete conclusion",
+      "tags": ["src:humanizer"]
     },
     {
       "from": "顛覆性變革",
       "to": ["劃時代的變革", "顛覆性創新", "game changer"],
       "type": "translationese",
-      "context": "cuimao.Business: PRC management-discourse compound; zh-TW prefers idiomatic 扭轉局勢 or English",
+      "context": "PRC management-discourse compound; zh-TW prefers idiomatic 扭轉局勢 or English",
       "english": "game changer",
       "context_clues": ["市場", "產業", "競爭", "策略", "技術", "創新"],
-      "tags": ["translation_aid", "cuimao_derived", "business_terms"]
+      "tags": ["src:cuimao", "topic:business_terms"]
     },
     {
       "from": "類",
