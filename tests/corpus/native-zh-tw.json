@@ -445,6 +445,456 @@
       "input": "該使用者跟蹤同事到停車場，小偷也跟蹤目標進入大樓。",
       "expected_fixed": "該使用者跟蹤同事到停車場，小偷也跟蹤目標進入大樓。",
       "expected_issues": []
+    },
+    {
+      "id": "native_attribution_casual_numbered_citation",
+      "repeat": 1,
+      "detect_ai": true,
+      "input": "專家認為這項安排可行[1]。",
+      "expected_fixed": "專家認為這項安排可行[1]。",
+      "expected_issues": []
+    },
+    {
+      "id": "native_attribution_technical_footnote",
+      "repeat": 1,
+      "detect_ai": true,
+      "input": "研究表明該方法可重現[^methods]。",
+      "expected_fixed": "研究表明該方法可重現[^methods]。",
+      "expected_issues": []
+    },
+    {
+      "id": "native_attribution_financial_link",
+      "repeat": 1,
+      "detect_ai": true,
+      "input": "有報告指出營收成長，[季報](https://example.com/earnings)提供完整數據。",
+      "expected_fixed": "有報告指出營收成長，[季報](https://example.com/earnings)提供完整數據。",
+      "expected_issues": []
+    },
+    {
+      "id": "native_attribution_news_register_uncited",
+      "repeat": 1,
+      "detect_ai": true,
+      "input": "據信該公司已於上季完成收購，交易金額約新台幣三十億元。",
+      "expected_fixed": "據信該公司已於上季完成收購，交易金額約新台幣三十億元。",
+      "expected_issues": []
+    },
+    {
+      "id": "native_colon_reveal_ordinary_technical",
+      "repeat": 1,
+      "detect_ai": true,
+      "input": "這次效能問題的關鍵在於：資料庫連線池設定過小。",
+      "expected_fixed": "這次效能問題的關鍵在於：資料庫連線池設定過小。",
+      "expected_issues": []
+    },
+    {
+      "id": "native_explanatory_self_qa_is_teaching_prose",
+      "repeat": 1,
+      "detect_ai": true,
+      "input": "為什麼要用快取？因為重算的成本很高。為什麼快取會失效？因為 TTL 設定到期。",
+      "expected_fixed": "為什麼要用快取？因為重算的成本很高。為什麼快取會失效？因為 TTL 設定到期。",
+      "expected_issues": []
+    },
+    {
+      "id": "native_lead_in_before_a_code_fence",
+      "repeat": 1,
+      "detect_ai": true,
+      "input": "新版套件終於支援離線安裝，值得期待。\n\n```sh\nmake install\n```\n",
+      "expected_fixed": "新版套件終於支援離線安裝，值得期待。\n\n```sh\nmake install\n```\n",
+      "expected_issues": [],
+      "content_type": "markdown"
+    },
+    {
+      "id": "native_attribution_named_agency",
+      "repeat": 1,
+      "detect_ai": true,
+      "input": "中央氣象署專家認為，今年秋颱數量可能高於平均。",
+      "expected_fixed": "中央氣象署專家認為，今年秋颱數量可能高於平均。",
+      "expected_issues": []
+    },
+    {
+      "id": "native_attribution_named_university",
+      "repeat": 1,
+      "detect_ai": true,
+      "input": "台大公衛學院的研究顯示，空氣品質與呼吸道就診人次呈正相關。",
+      "expected_fixed": "台大公衛學院的研究顯示，空氣品質與呼吸道就診人次呈正相關。",
+      "expected_issues": []
+    },
+    {
+      "id": "native_attribution_named_bureau",
+      "repeat": 1,
+      "detect_ai": true,
+      "input": "主計總處有報告指出，去年實質經常性薪資微幅下滑。",
+      "expected_fixed": "主計總處有報告指出，去年實質經常性薪資微幅下滑。",
+      "expected_issues": []
+    },
+    {
+      "id": "native_attribution_named_institute",
+      "repeat": 1,
+      "detect_ai": true,
+      "input": "國衛院研究表明，該疫苗在長者族群仍具保護力。",
+      "expected_fixed": "國衛院研究表明，該疫苗在長者族群仍具保護力。",
+      "expected_issues": []
+    },
+    {
+      "id": "native_attribution_trailing_citation",
+      "repeat": 1,
+      "detect_ai": true,
+      "input": "研究顯示，在控制了年齡與教育程度等變項之後，這項關聯仍然顯著，方法請參見 [1]。",
+      "expected_fixed": "研究顯示，在控制了年齡與教育程度等變項之後，這項關聯仍然顯著，方法請參見 [1]。",
+      "expected_issues": []
+    },
+    {
+      "id": "native_hedge_public_data_report",
+      "repeat": 1,
+      "detect_ai": true,
+      "input": "基於現有公開資料，本研究整理了近十年的用電量變化。",
+      "expected_fixed": "基於現有公開資料，本研究整理了近十年的用電量變化。",
+      "expected_issues": []
+    },
+    {
+      "id": "native_hedge_limited_information",
+      "repeat": 1,
+      "detect_ai": true,
+      "input": "由於資訊有限，我們僅能就已公開的財報做初步判讀。",
+      "expected_fixed": "由於資訊有限，我們僅能就已公開的財報做初步判讀。",
+      "expected_issues": []
+    },
+    {
+      "id": "native_error_report_is_not_a_reveal",
+      "repeat": 1,
+      "detect_ai": true,
+      "input": "你以為問題出在網路嗎？錯誤報告顯示是磁碟。為什麼會這樣？因為快取沒有清除。",
+      "expected_fixed": "你以為問題出在網路嗎？錯誤報告顯示是磁碟。為什麼會這樣？因為快取沒有清除。",
+      "expected_issues": []
+    },
+    {
+      "id": "native_extra_setting",
+      "repeat": 50,
+      "input": "這個功能不需要額外設定，安裝後就能直接使用。",
+      "expected_fixed": "這個功能不需要額外設定，安裝後就能直接使用。",
+      "expected_issues": []
+    },
+    {
+      "id": "native_overseas_plant",
+      "repeat": 50,
+      "input": "公司決定到海外設廠，同時在國外設立研發中心。",
+      "expected_fixed": "公司決定到海外設廠，同時在國外設立研發中心。",
+      "expected_issues": []
+    },
+    {
+      "id": "native_exception_config",
+      "repeat": 50,
+      "input": "另外設定一組旗標，例外設定則寫在另一個檔案。",
+      "expected_fixed": "另外設定一組旗標，例外設定則寫在另一個檔案。",
+      "expected_issues": []
+    },
+    {
+      "id": "native_accident_design",
+      "repeat": 50,
+      "input": "這場意外設計出的補救流程，格外設想周到。",
+      "expected_fixed": "這場意外設計出的補救流程，格外設想周到。",
+      "expected_issues": []
+    },
+    {
+      "id": "native_telephone_handset",
+      "repeat": 50,
+      "input": "他拿起電話話筒，聽筒裡沒有聲音。",
+      "expected_fixed": "他拿起電話話筒，聽筒裡沒有聲音。",
+      "expected_issues": []
+    },
+    {
+      "id": "native_race_track",
+      "repeat": 50,
+      "input": "賽車在賽道上跑了三圈，選手的跑道編號是七號。",
+      "expected_fixed": "賽車在賽道上跑了三圈，選手的跑道編號是七號。",
+      "expected_issues": []
+    },
+    {
+      "id": "native_market_close_review",
+      "repeat": 50,
+      "input": "收盤後我們復盤了這檔股票的交易紀錄。",
+      "expected_fixed": "收盤後我們復盤了這檔股票的交易紀錄。",
+      "expected_issues": []
+    },
+    {
+      "id": "native_head_and_level",
+      "repeat": 50,
+      "input": "病患的頭部外傷已縫合，相機要架在水平位置。",
+      "expected_fixed": "病患的頭部外傷已縫合，相機要架在水平位置。",
+      "expected_issues": []
+    },
+    {
+      "id": "native_alignment_and_lead",
+      "repeat": 50,
+      "input": "表格欄位要對齊，由資深工程師領導這個小組。",
+      "expected_fixed": "表格欄位要對齊，由資深工程師領導這個小組。",
+      "expected_issues": []
+    },
+    {
+      "id": "native_sediment_and_balance",
+      "repeat": 50,
+      "input": "加入試劑後出現白色沉澱，營養要均衡。",
+      "expected_fixed": "加入試劑後出現白色沉澱，營養要均衡。",
+      "expected_issues": []
+    },
+    {
+      "id": "native_topic_and_purpose",
+      "repeat": 50,
+      "input": "這是重要的課題，本文旨在探討成因。",
+      "expected_fixed": "這是重要的課題，本文旨在探討成因。",
+      "expected_issues": []
+    },
+    {
+      "id": "native_grab_the_phone",
+      "repeat": 50,
+      "input": "他伸手抓手機，另一手抓手臂上的傷口。",
+      "expected_fixed": "他伸手抓手機，另一手抓手臂上的傷口。",
+      "expected_issues": []
+    },
+    {
+      "id": "native_reveal_and_embrace",
+      "repeat": 50,
+      "input": "報告顯示成因，家長擁抱孩子安撫情緒。",
+      "detect_ai": true,
+      "expected_fixed": "報告顯示成因，家長擁抱孩子安撫情緒。",
+      "expected_issues": []
+    },
+    {
+      "id": "native_scoring_dimensions",
+      "repeat": 50,
+      "input": "問卷從三個維度評分，這份評量的指標分為知識與技能。",
+      "detect_ai": true,
+      "expected_fixed": "問卷從三個維度評分，這份評量的指標分為知識與技能。",
+      "expected_issues": []
+    },
+    {
+      "id": "native_ci_wai_boundary",
+      "repeat": 50,
+      "input": "他個性如此外向，彼此外貌相似，由此外推可得結論。",
+      "detect_ai": true,
+      "expected_fixed": "他個性如此外向，彼此外貌相似，由此外推可得結論。",
+      "expected_issues": []
+    },
+    {
+      "id": "native_source_document",
+      "repeat": 50,
+      "input": "請參閱來源文件的第三節，電源文件放在機櫃旁邊。",
+      "expected_fixed": "請參閱來源文件的第三節，電源文件放在機櫃旁邊。",
+      "expected_issues": []
+    },
+    {
+      "id": "native_target_list",
+      "repeat": 50,
+      "input": "請看達標清單，這次投標量很大。",
+      "expected_fixed": "請看達標清單，這次投標量很大。",
+      "expected_issues": []
+    },
+    {
+      "id": "native_single_reader_address",
+      "repeat": 50,
+      "input": "你可以修改設定檔，也可以重新啟動服務。",
+      "detect_ai": true,
+      "expected_fixed": "你可以修改設定檔，也可以重新啟動服務。",
+      "expected_issues": []
+    },
+    {
+      "id": "native_mini_is_not_a_pronoun",
+      "repeat": 50,
+      "input": "這是迷你版的設定，迷你主機也支援您的需求。",
+      "detect_ai": true,
+      "expected_fixed": "這是迷你版的設定，迷你主機也支援您的需求。",
+      "expected_issues": []
+    },
+    {
+      "id": "native_one_polite_request",
+      "repeat": 50,
+      "input": "執行前請先備份，接著依序停止服務與修改設定檔。",
+      "detect_ai": true,
+      "expected_fixed": "執行前請先備份，接著依序停止服務與修改設定檔。",
+      "expected_issues": []
+    },
+    {
+      "id": "native_quoted_tell_is_a_mention",
+      "repeat": 50,
+      "input": "我最近戒掉「賦能」這個詞，因為它什麼都沒說。",
+      "detect_ai": true,
+      "expected_fixed": "我最近戒掉「賦能」這個詞，因為它什麼都沒說。",
+      "expected_issues": []
+    },
+    {
+      "id": "native_lexical_trap_bushu_gongbu",
+      "repeat": 1,
+      "input": "行政院公佈署長人選。",
+      "expected_fixed": "行政院公佈署長人選。",
+      "expected_issues": []
+    },
+    {
+      "id": "native_lexical_trap_bushu_xuanbu",
+      "repeat": 1,
+      "input": "他宣佈署理主席的任命。",
+      "expected_fixed": "他宣佈署理主席的任命。",
+      "expected_issues": []
+    },
+    {
+      "id": "native_lexical_trap_siyu",
+      "repeat": 1,
+      "input": "這屬於個人隱私域流量的討論。",
+      "expected_fixed": "這屬於個人隱私域流量的討論。",
+      "expected_issues": []
+    },
+    {
+      "id": "native_lexical_trap_latong",
+      "repeat": 1,
+      "input": "工人正在拉通風管的繩索。",
+      "expected_fixed": "工人正在拉通風管的繩索。",
+      "expected_issues": []
+    },
+    {
+      "id": "native_lexical_trap_laxin",
+      "repeat": 1,
+      "input": "他拉新娘的手走上紅毯。",
+      "expected_fixed": "他拉新娘的手走上紅毯。",
+      "expected_issues": []
+    },
+    {
+      "id": "native_lexical_trap_jianli",
+      "repeat": 1,
+      "input": "精簡歷史年表可以幫助理解。",
+      "expected_fixed": "精簡歷史年表可以幫助理解。",
+      "expected_issues": []
+    },
+    {
+      "id": "native_lexical_trap_chengdu",
+      "repeat": 1,
+      "input": "誤差控制在一定程度上限之內。",
+      "detect_ai": true,
+      "expected_fixed": "誤差控制在一定程度上限之內。",
+      "expected_issues": []
+    },
+    {
+      "id": "native_lexical_trap_shensi",
+      "repeat": 1,
+      "input": "這份報告值得我們深思熟慮後再決定。",
+      "detect_ai": true,
+      "expected_fixed": "這份報告值得我們深思熟慮後再決定。",
+      "expected_issues": []
+    },
+    {
+      "id": "native_lexical_trap_maoni",
+      "repeat": 1,
+      "input": "我家的貓膩在我腿上不肯走。",
+      "expected_fixed": "我家的貓膩在我腿上不肯走。",
+      "expected_issues": []
+    },
+    {
+      "id": "native_lexical_trap_chuzhong",
+      "repeat": 1,
+      "input": "當初中央銀行的決議影響深遠。",
+      "expected_fixed": "當初中央銀行的決議影響深遠。",
+      "expected_issues": []
+    },
+    {
+      "id": "native_lexical_trap_cinai",
+      "repeat": 1,
+      "input": "此乃天意，非人力所能挽回。",
+      "expected_fixed": "此乃天意，非人力所能挽回。",
+      "expected_issues": []
+    },
+    {
+      "id": "native_lexical_trap_bubian",
+      "repeat": 1,
+      "input": "請提前辦理，以免造成不便。",
+      "detect_ai": true,
+      "expected_fixed": "請提前辦理，以免造成不便。",
+      "expected_issues": []
+    },
+    {
+      "id": "native_lexical_trap_hehuo",
+      "repeat": 1,
+      "input": "本條款適用於甲方和／或乙方。",
+      "detect_ai": true,
+      "expected_fixed": "本條款適用於甲方和／或乙方。",
+      "expected_issues": []
+    },
+    {
+      "id": "native_youqu_cleft_most",
+      "repeat": 1,
+      "input": "最有趣的是他的反應。",
+      "detect_ai": true,
+      "expected_fixed": "最有趣的是他的反應。",
+      "expected_issues": []
+    },
+    {
+      "id": "native_youqu_cleft_felt",
+      "repeat": 1,
+      "input": "他覺得有趣的是這件事的時機。",
+      "detect_ai": true,
+      "expected_fixed": "他覺得有趣的是這件事的時機。",
+      "expected_issues": []
+    },
+    {
+      "id": "native_youqu_true_false_question",
+      "repeat": 1,
+      "input": "這是很有趣的是非題。",
+      "detect_ai": true,
+      "expected_fixed": "這是很有趣的是非題。",
+      "expected_issues": []
+    },
+    {
+      "id": "native_suowei_without_quotes",
+      "repeat": 1,
+      "input": "他所謂的方法根本行不通。",
+      "detect_ai": true,
+      "expected_fixed": "他所謂的方法根本行不通。",
+      "expected_issues": []
+    },
+    {
+      "id": "native_specimen_bad_example_bullet",
+      "repeat": 1,
+      "input": "- ❌ 值得注意的是，這個做法更清晰、更精確、更有效率。\n- ✅ 這個做法更精確。\n",
+      "detect_ai": true,
+      "expected_fixed": "- ❌ 值得注意的是，這個做法更清晰、更精確、更有效率。\n- ✅ 這個做法更精確。\n",
+      "expected_issues": []
+    },
+    {
+      "id": "native_specimen_blockquote_nested",
+      "repeat": 1,
+      "input": "> - ❌ 值得注意的是這件事。\n",
+      "detect_ai": true,
+      "expected_fixed": "> - ❌ 值得注意的是這件事。\n",
+      "expected_issues": []
+    },
+    {
+      "id": "native_specimen_ordered_list",
+      "repeat": 1,
+      "input": "1. ❌ 值得注意的是這件事。\n",
+      "detect_ai": true,
+      "expected_fixed": "1. ❌ 值得注意的是這件事。\n",
+      "expected_issues": []
+    },
+    {
+      "id": "native_suowei_quoted_whole_phrase",
+      "repeat": 1,
+      "input": "「所謂的規範」其實沒有強制力。",
+      "detect_ai": true,
+      "expected_fixed": "「所謂的規範」其實沒有強制力。",
+      "expected_issues": []
+    },
+    {
+      "id": "native_suowei_quote_precedes",
+      "repeat": 1,
+      "input": "他說的「所謂的專業」讓人懷疑。",
+      "detect_ai": true,
+      "expected_fixed": "他說的「所謂的專業」讓人懷疑。",
+      "expected_issues": []
+    },
+    {
+      "id": "native_mention_blockquoted_checkbox",
+      "repeat": 1,
+      "input": "> - [ ] 檢查是否使用了值得注意的是\n",
+      "detect_ai": true,
+      "expected_fixed": "> - [ ] 檢查是否使用了值得注意的是\n",
+      "expected_issues": []
     }
   ]
 }
