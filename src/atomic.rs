@@ -2,7 +2,7 @@
 //
 // One implementation on purpose. This existed three times: the override store,
 // the scan cache, and the judgment cache. The copy that drifted wrote to a
-// fixed `.tmp` path, so two processes sharing the destination raced on it, and
+// fixed .tmp path, so two processes sharing the destination raced on it, and
 // fell back to writing straight over the live file when the rename failed,
 // which is the exact truncation the design exists to prevent.
 
@@ -18,7 +18,9 @@ use std::path::Path;
 ///
 /// Note that rename semantics detach a symlinked destination and ignore
 /// the umask in favor of the temp file's mode; callers that care about
-/// either (`baseline.rs` does) should write in place instead.
+/// either (`baseline.rs` does) should write in place instead. An existing
+/// destination's own mode is carried across, so a replacement is not a
+/// permission change.
 pub fn replace_file(dest: &Path, bytes: &[u8]) -> std::io::Result<()> {
     let parent = dest
         .parent()
@@ -27,7 +29,36 @@ pub fn replace_file(dest: &Path, bytes: &[u8]) -> std::io::Result<()> {
     std::fs::create_dir_all(parent)?;
     let mut tmp = tempfile::NamedTempFile::new_in(parent)?;
     tmp.write_all(bytes)?;
+    preserve_mode(dest, &tmp)?;
     persist_with_retry(tmp, dest)
+}
+
+/// Carry an existing destination's permission bits onto the replacement.
+///
+/// The rename takes the temp file's mode with it and NamedTempFile creates at
+/// 0600, so without this, replacing a file somebody had deliberately made
+/// group-readable would narrow it and say nothing. A destination that does not
+/// exist keeps the 0600: a new cache or override file belongs to the user who
+/// ran this, and inheriting the umask would be a wider default than the one
+/// this code would choose.
+#[cfg(unix)]
+fn preserve_mode(dest: &Path, tmp: &tempfile::NamedTempFile) -> std::io::Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+
+    // Through the link rather than at it: what is being replaced is the file a
+    // reader would open.
+    let Ok(meta) = std::fs::metadata(dest) else {
+        return Ok(());
+    };
+    let mode = meta.permissions().mode() & 0o7777;
+    std::fs::set_permissions(tmp.path(), std::fs::Permissions::from_mode(mode))
+}
+
+/// Windows has no mode to carry, and the ACL travels with the destination name
+/// rather than with the file, so the rename already does the right thing.
+#[cfg(not(unix))]
+fn preserve_mode(_dest: &Path, _tmp: &tempfile::NamedTempFile) -> std::io::Result<()> {
+    Ok(())
 }
 
 /// Persist `tmp` to `dest`, retrying a transient Windows failure.
@@ -65,6 +96,39 @@ fn persist_with_retry(mut tmp: tempfile::NamedTempFile, dest: &Path) -> std::io:
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn an_existing_mode_survives_the_replacement() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempfile::tempdir().unwrap();
+        let dest = dir.path().join("kept.json");
+        std::fs::write(&dest, b"old").unwrap();
+        std::fs::set_permissions(&dest, std::fs::Permissions::from_mode(0o644)).unwrap();
+
+        replace_file(&dest, b"new").unwrap();
+
+        let mode = std::fs::metadata(&dest).unwrap().permissions().mode() & 0o777;
+        assert_eq!(
+            mode, 0o644,
+            "replacing a file must not change who can read it"
+        );
+        assert_eq!(std::fs::read(&dest).unwrap(), b"new");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_new_file_stays_private() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempfile::tempdir().unwrap();
+        let dest = dir.path().join("fresh.json");
+        replace_file(&dest, b"new").unwrap();
+
+        let mode = std::fs::metadata(&dest).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o600, "a file this code creates is the user's alone");
+    }
 
     #[test]
     fn replaces_existing_content() {

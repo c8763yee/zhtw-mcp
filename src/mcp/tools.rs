@@ -1,7 +1,7 @@
 // MCP tool handler implementations.
 //
 // One tool exposed to the MCP client:
-//   zhtw — unified lint / fix / gate for Traditional Chinese (Taiwan) text
+//   zhtw: unified lint / fix / gate for Traditional Chinese (Taiwan) text
 
 use std::cell::OnceCell;
 use std::sync::Arc;
@@ -159,6 +159,7 @@ impl Server {
         if let Some(error) = reject_unknown_params(arguments) {
             return Err(error);
         }
+
         // Refuse before scanning rather than after. "verify" ships sentence
         // excerpts of the caller's text to a third party, and the operator who
         // set the variable outranks the model that asked.
@@ -176,11 +177,11 @@ impl Server {
 
         // Whatever this call judged is written now rather than at exit. A
         // stateless client opens a process per call and ends it with a signal,
-        // which runs neither `Drop` nor the exit flush, so a session's
-        // judgments were being thrown away on the teardown path the clients
-        // actually use. A call that judged nothing writes nothing: eviction
-        // alone does not earn a rewrite of the whole store, because the next
-        // open redoes it anyway.
+        // which runs neither Drop nor the exit flush, so a session's judgments
+        // were being thrown away on the teardown path the clients actually use.
+        // A call that judged nothing writes nothing: eviction alone does not
+        // earn a rewrite of the whole store, because the next open redoes it
+        // anyway.
         self.judgment_cache.flush_if_judged();
         result
     }
@@ -316,7 +317,7 @@ impl Server {
         let params = CheckParams::parse(args, default_output_mode(client))?;
 
         // Copy fields bind by value, the two owned ones by reference, so the
-        // struct itself stays put for `CheckRequest` to borrow below.
+        // struct itself stays put for CheckRequest to borrow below.
         let CheckParams {
             fix_mode,
             profile,
@@ -363,7 +364,7 @@ impl Server {
         .find(|&(_, requested)| requested)
         .filter(|_| output_mode == OutputMode::Tabular);
         if let Some((name, _)) = tabular_conflict {
-            // The constraint is about `output`, so the machine-readable list is
+            // The constraint is about output, so the machine-readable list is
             // the output modes that allow this flag, derived rather than
             // copied; the prose belongs in the message.
             let allowed: Vec<&str> = accepted_values("output")
@@ -673,7 +674,7 @@ impl Server {
             Some(self.catalog.scanner.segmenter()),
         );
 
-        // Re-scan after fixes — use post-fix ai_signature, not pre-fix. Remap
+        // Re-scan after fixes: use post-fix ai_signature, not pre-fix. Remap
         // exclusion zones to post-fix coordinates instead of rebuilding from
         // scratch (avoids re-parsing markdown/URLs on the entire document for
         // every fix cycle).
@@ -1139,7 +1140,7 @@ fn parse_output_mode(args: &Value, default: OutputMode) -> ParamResult<OutputMod
 
 /// Known AI agent/CLI client names that benefit from compact output.
 /// Matched as exact full-name against the lowercased `clientInfo.name`.
-/// Only programmatic agents/CLIs — NOT desktop GUI apps like "Claude Desktop".
+/// Only programmatic agents/CLIs: NOT desktop GUI apps like "Claude Desktop".
 const AI_AGENT_CLIENTS: &[&str] = &[
     "claude-code",
     "claude code",
@@ -1281,6 +1282,7 @@ fn build_explanation(issue: &Issue) -> Option<String> {
             if let Some(ctx) = &issue.context {
                 parts.push(format!("'{}' — {}.", issue.found, ctx));
             }
+
             // Read the suggestions directly rather than the derived
             // suggested_rewrite field, so a stale derivation cannot change what
             // the reader is told.
@@ -1500,8 +1502,8 @@ struct AnchorProvenance<'a> {
     anchor_match: Option<bool>,
 }
 
-// `EditorialConfidence` is canonical-defined in `crate::rules::ruleset` so that
-// `SpellingRule.editorial_confidence` and the per-issue field share a single
+// EditorialConfidence is canonical-defined in crate::rules::ruleset so that
+// SpellingRule.editorial_confidence and the per-issue field share a single
 // type. Re-exported here for the explain pipeline.
 use crate::rules::ruleset::EditorialConfidence;
 
@@ -1526,7 +1528,7 @@ struct ExplainMeta<'a> {
     auto_fix_safe: bool,
     /// Whether the suggestion benefits from manual review.
     needs_review: bool,
-    /// Per-issue editorial confidence — distinguishes binary corrections
+    /// Per-issue editorial confidence: distinguishes binary corrections
     /// from style preferences (e.g. 場景 is correct zh-TW for a film or
     /// stage scene, so rewriting it to 情境 is an IT-context judgment call,
     /// whereas 線程 to 執行緒 is simply the zh-TW term).
@@ -1569,7 +1571,7 @@ fn heuristic_editorial_confidence(issue: &Issue) -> EditorialConfidence {
 fn derive_explain_meta(issue: &Issue) -> ExplainMeta<'_> {
     use crate::rules::ruleset::IssueType;
 
-    // -- Domain extraction from `@domain X` markers in the rule context.
+    // -- Domain extraction from "@domain X" markers in the rule context.
     let domain = issue.context.as_deref().and_then(|c| {
         let needle = "@domain ";
         c.find(needle).map(|i| {
@@ -1583,8 +1585,8 @@ fn derive_explain_meta(issue: &Issue) -> ExplainMeta<'_> {
     });
 
     // -- Editorial confidence. Rule-level annotation wins (from
-    // assets/ruleset.json `editorial_confidence`); else heuristics on rule type
-    // / severity / anchor_match / context_clues.
+    // assets/ruleset.json editorial_confidence); else heuristics on rule type /
+    // severity / anchor_match / context_clues.
     let editorial_confidence = issue
         .editorial_confidence
         .unwrap_or_else(|| heuristic_editorial_confidence(issue));
@@ -1597,7 +1599,7 @@ fn derive_explain_meta(issue: &Issue) -> ExplainMeta<'_> {
         || matches!(editorial_confidence, EditorialConfidence::Low)
             && issue.editorial_confidence.is_some();
 
-    // -- Auto-fix safety + review need. Invariant: `low` confidence forces
+    // -- Auto-fix safety + review need. Invariant: low confidence forces
     // auto_fix_safe=false + needs_review=true. Otherwise punctuation / case /
     // variant / typo hits with a single suggestion are auto-fix safe.
     let single_unambiguous = issue.suggestions.len() == 1
@@ -2009,7 +2011,7 @@ fn build_check_config(
         cfg = cfg.with_stance(st);
     }
 
-    // `detect_style` mirrors the CLI shorthand: it always computes the full
+    // detect_style mirrors the CLI shorthand: it always computes the full
     // three-axis scorecard, regardless of explicit per-axis disables.
     if flags.detect_style {
         cfg.translationese_detection = true;
@@ -2033,7 +2035,7 @@ fn build_check_config(
     }
 
     // Resolve effective AI detection: explicit arg wins over profile default.
-    // All four AI sub-flags move as a unit — enabling detection turns them all
+    // All four AI sub-flags move as a unit: enabling detection turns them all
     // on, disabling turns them all off.
     let detect_ai = if flags.detect_style {
         true
@@ -2061,7 +2063,7 @@ fn build_check_config(
 
 /// Build the composite three-axis scorecard when the caller explicitly
 /// opts in via `detect_style` (CLI: `--detect-style` flag, MCP:
-/// `detect_style: true` argument).  Pure aggregation — returns `None`
+/// `detect_style: true` argument).  Pure aggregation, returns `None`
 /// when not requested so the standard payload stays lean.
 fn style_scorecard_for(
     detect_style: bool,
@@ -2317,7 +2319,7 @@ fn build_issues_list<'a>(
 ///
 /// Groups issues by (found, rule_type, suggestions, severity) key. Each group
 /// becomes one entry with count and locations. Serialized directly via
-/// `#[derive(Serialize)]` on `CompactGroup` — no intermediate `Value` per
+/// `#[derive(Serialize)]` on `CompactGroup`: no intermediate `Value` per
 /// group.
 fn build_compact_groups(issues: &[Issue], explain: bool, include_stats: bool) -> Vec<CompactGroup> {
     use std::collections::BTreeMap;
@@ -2785,7 +2787,9 @@ fn input_schema_properties() -> &'static JsonObject {
             "verify".into(),
             json!({
                 "type": "boolean",
-                "description": "Anchor-verify issues via Google Translate"
+                "description": "Anchor-verify issues via Google Translate. \
+Sends the sentences around each issue to Google. Off unless asked, and refused \
+when the server has ZHTW_NO_NETWORK set."
             }),
         );
         props.insert("output".into(), json!({
@@ -2893,7 +2897,7 @@ impl Catalog {
     pub(crate) fn read_resource(&self, uri: &str) -> ParamResult<ReadResourceResult> {
         resources::read_resource(uri, self.scanner.spelling_rules(), &self.ambiguous_dict)
             .map(|result| {
-                // Not cacheable, for the reason given on `list_tools`.
+                // Not cacheable, for the reason given on list_tools.
                 result.with_ttl_ms(0).with_cache_scope(CacheScope::Private)
             })
             // resource_not_found rather than invalid_params: the URI is
@@ -3343,7 +3347,7 @@ mod tests {
             Severity::Warning,
         );
         issue.tier2_outcome = Tier2Outcome::GrayZone;
-        // No LLM annotation — stays unresolved.
+        // No LLM annotation: stays unresolved.
         assert_eq!(ResolutionTier::classify(&issue), ResolutionTier::Unresolved);
     }
 
@@ -3571,7 +3575,7 @@ mod tests {
     #[test]
     fn a_declared_default_is_the_one_the_parser_applies() {
         // Generic over the schema rather than naming the field, the same way
-        // the accepted-values check is: a `"default"` a client reads and a
+        // the accepted-values check is: a '"default"' a client reads and a
         // default the parser applies are two statements of one fact, and the
         // drift between them is silent.
         for (field, prop) in input_schema_properties() {
@@ -3622,9 +3626,9 @@ mod tests {
             ("output", |v| parse_output_mode(v, OutputMode::Full).is_ok()),
         ];
 
-        // Every field routed through `enum_param_error` needs a schema enum to
+        // Every field routed through enum_param_error needs a schema enum to
         // quote, including the two parsed inline rather than by a named parser:
-        // without one the rejection reports an empty `accepted` list.
+        // without one the rejection reports an empty accepted list.
         for field in [
             "fix_mode",
             "content_type",
