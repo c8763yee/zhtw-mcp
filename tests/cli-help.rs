@@ -130,12 +130,29 @@ fn help_output_matches_the_docs_blocks() {
     }
 }
 
+/// Every subcommand, taken from the docs blocks rather than retyped.
+///
+/// build.rs already rejects a block without a topic and a topic without a
+/// block, so this is the one list of subcommands a test can read without
+/// becoming another copy to keep in step.
+fn subcommands() -> Vec<String> {
+    let md = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/docs/cli.md")).unwrap();
+    let names: Vec<String> = extract_cli_blocks(&md)
+        .unwrap()
+        .into_iter()
+        .map(|(name, _)| name)
+        .filter(|name| name != "global")
+        .collect();
+    assert!(!names.is_empty(), "docs/cli.md should carry cli blocks");
+    names
+}
+
 // Contracts the docs blocks cannot enforce by construction.
 
 #[test]
 fn global_help_lists_every_subcommand() {
     let stdout = help_stdout(&["--help"]);
-    for command in ["lint", "convert", "setup", "pack", "tm", "cache"] {
+    for command in subcommands() {
         assert!(
             stdout.contains(&format!("\n  {command} ")),
             "global help should list '{command}':\n{stdout}"
@@ -158,8 +175,10 @@ fn short_flag_matches_global_help() {
 
 #[test]
 fn each_subcommand_prints_its_own_message() {
-    for command in ["lint", "convert", "setup", "pack", "tm", "cache"] {
-        let stdout = help_stdout(&[command, "--help"]);
+    // A subcommand with no row in SUBCOMMAND_TOPICS prints the global message
+    // instead of its own, and this is what says so.
+    for command in subcommands() {
+        let stdout = help_stdout(&[&command, "--help"]);
         assert!(
             stdout.starts_with(&format!("zhtw-mcp {command} - ")),
             "'{command} --help' should open with its own title:\n{stdout}"

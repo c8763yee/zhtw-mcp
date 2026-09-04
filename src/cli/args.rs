@@ -1155,6 +1155,40 @@ mod tests {
     }
 
     #[test]
+    fn every_subcommand_row_reaches_the_command_it_names() {
+        // The match below is exhaustive on purpose.  A new Command variant
+        // stops this test compiling until somebody says which help topic it
+        // answers to, and a topic needs a help text, which build.rs will not
+        // accept without a docs block, which each_subcommand_prints_its_own_
+        // message then runs through the binary.  That chain is what makes a
+        // missing SUBCOMMAND_TOPICS row a failure rather than silent global
+        // help.
+        for (name, topic) in SUBCOMMAND_TOPICS {
+            let argv = match name {
+                "lint" => vec![name, "a.md"],
+                "convert" => vec![name],
+                "setup" => vec![name, "cursor"],
+                "pack" => vec![name, "list"],
+                "tm" => vec![name, "list"],
+                "cache" => vec![name, "clear"],
+                _ => panic!("give the new subcommand {name} an argv here"),
+            };
+            let reached = match parse(&argv).expect("should parse").command {
+                Command::Lint(_) => HelpTopic::Lint,
+                Command::Convert(_) => HelpTopic::Convert,
+                Command::Setup(_) => HelpTopic::Setup,
+                Command::Pack { .. } => HelpTopic::Pack,
+                Command::Tm(_) => HelpTopic::Tm,
+                Command::CacheClear => HelpTopic::Cache,
+                Command::Server | Command::Help(_) => {
+                    panic!("{name} should parse as a subcommand")
+                }
+            };
+            assert_eq!(reached, topic, "{name}");
+        }
+    }
+
+    #[test]
     fn an_empty_argv_parses_as_the_default_command() {
         // The parse helper always supplies argv[0], so this one calls through
         // directly.  A process exec'd with no argv at all arrives this way.
