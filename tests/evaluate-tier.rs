@@ -2,7 +2,7 @@
 //
 // The three-tier pipeline automatically resolves/suppresses issues locally
 // where possible, sending only genuine gray-zone ambiguity to Tier 3 (LLM). No
-// user configuration needed — the system dynamically handles the tradeoff.
+// user configuration needed: the system dynamically handles the tradeoff.
 //
 // These print a table AND assert a floor. They used to only print, which made
 // six tests that could not fail: a regression that sent every issue to the LLM,

@@ -218,11 +218,12 @@ fn display_path_prefix(file_arg: &str) -> String {
     if file_arg == "--" {
         return String::new();
     }
+
     // These paths came out of cli::discover canonicalized, so the current
     // directory has to be canonicalized the same way or the two spellings of
-    // one directory do not match and nothing is stripped.  Resolved once:
-    // both halves are syscalls, this runs per file, and nothing in the process
-    // calls set_current_dir.
+    // one directory do not match and nothing is stripped. Resolved once: both
+    // halves are syscalls, this runs per file, and nothing in the process calls
+    // set_current_dir.
     static CWD: OnceLock<Option<String>> = OnceLock::new();
     let cwd = CWD.get_or_init(|| {
         std::env::current_dir()

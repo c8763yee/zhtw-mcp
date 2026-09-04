@@ -1,4 +1,4 @@
-// Integration tests for the CLI `lint` subcommand.
+// Integration tests for the CLI lint subcommand.
 //
 // Tests exit codes, output formats, profile selection, content-type handling,
 // max-errors gating, max-warnings gating, and multi-file/directory linting.
@@ -1475,7 +1475,7 @@ fn cli_lint_detect_style_emits_three_axis_scorecard() {
         .any(|axis| scores.get(*axis).is_some());
     assert!(has_any, "scorecard must emit at least one axis");
 
-    // Three scores are reported as separate fields — not combined.
+    // Three scores are reported as separate fields: not combined.
     let ai = scores.get("ai");
     let trans = scores.get("translationese");
     let regional_density = scores.get("regional_density");
@@ -1975,7 +1975,7 @@ fn cli_lint_orthographic_tier_never_picks_among_candidates() {
     // used to take the first of however many suggestions were offered, which
     // meant a pack could get one of two judgment calls written to the user's
     // file at --fix=orthographic, the most conservative tier there is. Both
-    // routes into that arm are covered here: a plain multi-entry `to`, and a
+    // routes into that arm are covered here: a plain multi-entry to, and a
     // multi-entry context group.
     let dir = tempfile::tempdir().unwrap();
     for (name, rule, text) in [
@@ -2024,10 +2024,10 @@ fn cli_lint_orthographic_tier_never_picks_among_candidates() {
 #[test]
 fn cli_lint_editorial_confidence_gate_covers_a_shipped_rule() {
     // Every other test of this gate builds a synthetic pack. Seven shipped
-    // rules carry editorial_confidence: low, but six have multi-entry `to`
-    // lists and were already declined at suggestion selection, so 場景 is the
-    // only one whose behavior the annotation actually changes. Without this the
-    // gate is only ever exercised against rules that do not ship.
+    // rules carry editorial_confidence: low, but six have multi-entry to lists
+    // and were already declined at suggestion selection, so 場景 is the only
+    // one whose behavior the annotation actually changes. Without this the gate
+    // is only ever exercised against rules that do not ship.
     let dir = tempfile::tempdir().unwrap();
     let safe = dir.path().join("safe.md");
     let contextual = dir.path().join("contextual.md");
@@ -2393,10 +2393,10 @@ fn cli_no_network_refuses_before_fix_writes_anything() {
     }
 }
 
-// The five-then-ten attribution phrases used to live in a `const` inside the
-// scanner, so they had no override, no `disabled` flag and no provenance gate
+// The five-then-ten attribution phrases used to live in a const inside the
+// scanner, so they had no override, no disabled flag and no provenance gate
 // while every other rule had all three. They are ruleset rules now, carrying a
-// `structural_guard` that keeps the citation check the schema cannot express.
+// structural_guard that keeps the citation check the schema cannot express.
 // What that buys is exactly this: retiring one phrase without touching the
 // rest.
 #[test]

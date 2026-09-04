@@ -1,12 +1,12 @@
-// Project-level glossary: `banned`, `preferred`, `proper_nouns`.
+// Project-level glossary: banned, preferred, proper_nouns.
 //
 // Layered above the embedded ruleset and pack store but below banned-term
-// enforcement and translation memory. Full precedence order: glossary `banned`
-// > TM > glossary `preferred` > domain pack > embedded ruleset.
+// enforcement and translation memory. Full precedence order: glossary banned
+// > TM > glossary preferred > domain pack > embedded ruleset.
 //
-// `banned`: terms that must always fire, regardless of context_clues.
-// `preferred`: TW forms the consistency report uses to choose the canonical
-// suggestion. `proper_nouns`: never flag (added to the suppression list).
+// banned: terms that must always fire, regardless of context_clues. preferred:
+// TW forms the consistency report uses to choose the canonical suggestion.
+// proper_nouns: never flag (added to the suppression list).
 
 use crate::engine::excluded::{is_excluded, ByteRange};
 use crate::rules::ruleset::{Issue, IssueType, Severity};
@@ -73,7 +73,7 @@ pub fn apply_glossary_with_coordinates(
 ///    truth: the author asked for these to always fire.
 ///
 /// Returns the modified issue list, sorted by offset.  Synthetic
-/// banned-term issues carry `line: 0, col: 0` — callers must run
+/// banned-term issues carry `line: 0, col: 0`, callers must run
 /// [LineIndex::fill_line_col_sorted] before reporting, or use
 /// [apply_glossary_with_coordinates], which does it for you.
 pub fn apply_glossary(
@@ -96,7 +96,7 @@ pub fn apply_glossary(
     //     (severity → Error, internal glossary-banned flag).
     //     Upgrading instead of injecting prevents duplicate output AND
     //     guarantees the banned-term report survives TM downgrade,
-    //     which honors the documented `banned > TM` precedence.
+    //     which honors the documented "banned > TM" precedence.
     //   - Otherwise inject a synthetic Error issue.
     for banned in &glossary.banned {
         if banned.is_empty() {

@@ -206,14 +206,14 @@ mod tests {
 
     #[test]
     fn a_revision_without_a_handshake_is_never_offered_by_one() {
-        // The refusal for an unsupported `initialize` names what the client
-        // could ask for instead, so a revision that has no `initialize` must
-        // not appear there: it would send the client back to the method that
-        // just failed. The table is what keeps the two lists in step.
+        // The refusal for an unsupported initialize names what the client could
+        // ask for instead, so a revision that has no initialize must not appear
+        // there: it would send the client back to the method that just failed.
+        // The table is what keeps the two lists in step.
         //
         // 2026-07-28 is named outright rather than left to the loop below,
         // which passes for free if nothing is marked as lacking a handshake.
-        // That it deleted `initialize` is a fact about the revision, not a
+        // That it deleted initialize is a fact about the revision, not a
         // preference, so the table is wrong if it ever says otherwise.
         let negotiable = negotiable_protocol_versions();
         assert!(
@@ -239,8 +239,8 @@ mod tests {
 
     #[test]
     fn every_served_revision_is_advertised() {
-        // `server/discover` is the only place a client can learn about a
-        // revision it cannot negotiate, so the advertised list is all of them.
+        // server/discover is the only place a client can learn about a revision
+        // it cannot negotiate, so the advertised list is all of them.
         let supported = supported_protocol_versions();
         assert_eq!(supported.len(), REVISIONS.len());
         for revision in REVISIONS {

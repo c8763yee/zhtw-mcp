@@ -1,7 +1,7 @@
 // Unicode normalization for consistent scanning.
 //
-// Applies NFC normalization before scanning so that identical-looking text
-// with different byte representations produces identical diagnostics.
+// Applies NFC normalization before scanning so that identical-looking text with
+// different byte representations produces identical diagnostics.
 // Returns the normalized text and a byte-offset mapping from normalized
 // positions back to original positions.
 
@@ -29,10 +29,10 @@ pub struct Normalized<'a> {
 /// maps to itself). When normalization changes character boundaries, the
 /// mapping tracks how each normalized byte relates to the original.
 pub fn normalize_nfc(input: &str) -> Normalized<'_> {
-    // Fast path: quick-check first so common clean zh-TW input avoids the
-    // full normalization walk and any allocation.  Fall back to the exact
-    // check only for the indeterminate Maybe case; skip it entirely when
-    // the answer is already definitive (Yes or No).
+    // Fast path: quick-check first so common clean zh-TW input avoids the full
+    // normalization walk and any allocation. Fall back to the exact check only
+    // for the indeterminate Maybe case; skip it entirely when the answer is
+    // already definitive (Yes or No).
     match unicode_normalization::is_nfc_quick(input.chars()) {
         IsNormalized::Yes => {
             return Normalized {
@@ -55,18 +55,17 @@ pub fn normalize_nfc(input: &str) -> Normalized<'_> {
     // the largest unit NFC can rewrite: composition never joins two starters
     // (Hangul jamo excepted, handled below) and canonical reordering never
     // moves a mark past one. Normalizing each segment separately therefore
-    // concatenates to the same string as normalizing the whole input, and
-    // every byte it produces belongs to that one segment.
+    // concatenates to the same string as normalizing the whole input, and every
+    // byte it produces belongs to that one segment.
     //
     // The previous version walked output chars and skipped any original
     // combining mark that did not equal the current one, assuming it had been
     // absorbed. A mark can also expand: U+0344 becomes U+0308 U+0301, one char
     // into two. The skip then consumed the following base character, and every
     // offset after it pointed at the wrong place, so a fix wrote its
-    // replacement over neighbouring text.
-    // The normalized text is assembled from the same segments the map is
-    // built from, so it is produced once rather than normalized whole and
-    // then again per segment.
+    // replacement over neighbouring text. The normalized text is assembled from
+    // the same segments the map is built from, so it is produced once rather
+    // than normalized whole and then again per segment.
     let mut nfc_text = String::with_capacity(input.len());
     let mut offset_map = Vec::with_capacity(input.len() + 1);
     let mut segment_start = 0usize;
@@ -180,6 +179,7 @@ fn starts_segment(ch: char, prev: Option<char>) -> bool {
     let Some(prev) = prev else {
         return true;
     };
+
     // UAX #15 Hangul composition, the only case where a starter joins another:
     // a leading jamo takes a vowel, and an LV syllable takes a trailing jamo.
     // Two complete syllables never compose, so they are separate segments.
@@ -188,6 +188,7 @@ fn starts_segment(ch: char, prev: Option<char>) -> bool {
     const T: std::ops::RangeInclusive<u32> = 0x11A8..=0x11C2;
     const S: std::ops::RangeInclusive<u32> = 0xAC00..=0xD7A3;
     let (prev, cur) = (u32::from(prev), u32::from(ch));
+
     // The trailing jamo follows a vowel as well as an LV syllable, because the
     // walk sees the source characters: in L V T the character before T is the
     // vowel, and the L+V it composed with is not written down anywhere.
@@ -248,7 +249,8 @@ mod tests {
         let norm = normalize_nfc(decomposed);
         assert_eq!(norm.text, "\u{00E9}"); // NFC form: é
         assert_eq!(norm.text.len(), 2); // é is 2 UTF-8 bytes
-                                        // The normalized é maps back to byte 0 (the 'e' position).
+                                        // The normalized é maps back to byte 0
+                                        // (the 'e' position).
         assert_eq!(map_offset(&norm.offset_map, 0), 0);
         // End sentinel maps to original end.
         assert_eq!(
@@ -267,7 +269,9 @@ mod tests {
         assert_eq!(map_offset(&norm.offset_map, 0), 0);
         // 'é' at norm byte 1 maps to orig byte 1 (the 'e').
         assert_eq!(map_offset(&norm.offset_map, 1), 1);
-        // 'b' at norm byte 3 maps to orig byte 4 (after e + combining = 3 bytes).
+
+        // 'b' at norm byte 3 maps to orig byte 4 (after e + combining = 3
+        // bytes).
         assert_eq!(map_offset(&norm.offset_map, 3), 4);
     }
 
@@ -312,8 +316,8 @@ mod tests {
         // The remaining U+0301 in NFC output must map to byte 3 in the original
         // (the second mark), not byte 1 (the first, absorbed mark).
         //
-        // Original bytes: a(0), U+0301(1-2), U+0301(3-4)  — total 5 bytes
-        // NFC bytes:       á(0-1), U+0301(2-3)             — total 4 bytes
+        // - Original bytes: a(0), U+0301(1-2), U+0301(3-4), 5 in total.
+        // - NFC bytes: á(0-1), U+0301(2-3), 4 in total.
         let input = "a\u{0301}\u{0301}";
         assert_eq!(input.len(), 5); // a=1, U+0301=2, U+0301=2
         let norm = normalize_nfc(input);
@@ -379,9 +383,9 @@ mod invariants {
     // single wrong entry writes a fix over neighbouring text. Four properties
     // have to hold for any input, and the alphabet below is chosen to exercise
     // the cases the segment walk reasons about: composing pairs, a mark that
-    // expands into two (U+0344), canonical reordering across combining
-    // classes, Hangul jamo that compose across starters, and scripts whose
-    // marks the old block list missed.
+    // expands into two (U+0344), canonical reordering across combining classes,
+    // Hangul jamo that compose across starters, and scripts whose marks the old
+    // block list missed.
     #[test]
     fn the_offset_map_holds_for_random_input() {
         const ALPHABET: &[char] = &[
@@ -399,7 +403,8 @@ mod invariants {
             assert_eq!(&*norm.text, expected, "case {case}: {input:?}");
 
             if norm.offset_map.is_empty() {
-                // Fast path: identity, only taken when the input is already NFC.
+                // Fast path: identity, only taken when the input is already
+                // NFC.
                 assert_eq!(&*norm.text, input, "case {case}: {input:?}");
                 continue;
             }

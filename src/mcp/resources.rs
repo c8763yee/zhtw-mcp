@@ -1,8 +1,8 @@
 // MCP Resources: expose reference data as read-only MCP resources.
 //
 // Two resources:
-//   zh-tw://style-guide/moe   — MoE punctuation, variant, and vocabulary standards
-//   zh-tw://dictionary/ambiguous — terms needing LLM disambiguation
+//   zh-tw://style-guide/moe     MoE punctuation, variant, and vocabulary standards
+//   zh-tw://dictionary/ambiguous   terms needing LLM disambiguation
 
 use std::sync::OnceLock;
 

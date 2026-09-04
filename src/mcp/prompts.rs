@@ -1,9 +1,9 @@
 // MCP Prompts: expose editorial persona prompts.
 //
 // Three prompts:
-//   normalize_tone     — ground an LLM in MoE-standard zh-TW writing conventions
-//   lint_natural       — translate free-form requests into zhtw calls
-//   editorial_review   — multi-turn editorial workflow persona
+//   normalize_tone       ground an LLM in MoE-standard zh-TW writing conventions
+//   lint_natural         translate free-form requests into zhtw calls
+//   editorial_review     multi-turn editorial workflow persona
 
 use rmcp::model::{GetPromptResult, Prompt, PromptArgument, PromptMessage, Role};
 

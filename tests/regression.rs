@@ -272,7 +272,7 @@ fn editorial_corpus_basic_validation() {
             profile,
             corpus.detect_ai,
         );
-        // Editorial corpus is evaluated independently — basic smoke test.
+        // Editorial corpus is evaluated independently: basic smoke test.
     }
 }
 

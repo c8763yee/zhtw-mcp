@@ -42,7 +42,7 @@ OUTPUT = REPO / "src" / "engine" / "s2t_data.rs"
 MANIFEST = REPO / "Cargo.toml"
 
 # The OpenCC pin lives in [package.metadata.opencc] in Cargo.toml, next to
-# every other pinned dependency of this crate, so `cargo metadata` reports it
+# every other pinned dependency of this crate, so "cargo metadata" reports it
 # and a bump shows up in the manifest diff rather than buried in a script.
 #
 # The pin used to say "master", with a comment claiming that was for
@@ -50,8 +50,8 @@ MANIFEST = REPO / "Cargo.toml"
 # forever, so two developers at the same repo commit built different conversion
 # tables depending on when they first cloned.
 #
-# To bump: change `commit` in Cargo.toml, run this script, and paste the printed
-# source hash into `source-hash`.  The check below refuses to generate if only
+# To bump: change commit in Cargo.toml, run this script, and paste the printed
+# source hash into source-hash.  The check below refuses to generate if only
 # one of the two moved, so a bump cannot be half-applied.
 
 

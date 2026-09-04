@@ -1,11 +1,11 @@
 // Document-wide terminology consistency report.
 //
-// Groups scan issues by their `english` field (natural equivalence class), then
+// Groups scan issues by their english field (natural equivalence class), then
 // for each group checks whether the canonical zh-TW form also appears elsewhere
-// in the document. Mixed usage produces a `Consistency` diagnostic alerting the
+// in the document. Mixed usage produces a Consistency diagnostic alerting the
 // author that the same concept is referred to with both regional variants.
 //
-// TM-suppressed issues are excluded from consistency grouping — those are
+// TM-suppressed issues are excluded from consistency grouping: those are
 // user-approved overrides, not inadvertent inconsistency.
 
 use std::collections::BTreeMap;
@@ -15,7 +15,7 @@ use serde::Serialize;
 use crate::rules::glossary::ProjectGlossary;
 use crate::rules::ruleset::{Issue, IssueType, Severity};
 
-/// One occurrence of a calque in the document — used to anchor the
+/// One occurrence of a calque in the document: used to anchor the
 /// consistency diagnostic.
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct ConsistencyOccurrence {
@@ -55,7 +55,7 @@ impl ConsistencyReport {
 /// Algorithm:
 ///   1. Filter to CrossStrait / Confusable issues with non-empty
 ///      `english`.  Those are the cleanest equivalence-class anchors.
-///   2. Skip issues whose severity is Info — TM-suppressed downgrades
+///   2. Skip issues whose severity is Info: TM-suppressed downgrades
 ///      land at Info; they are user-approved and should not count.
 ///   3. Group by `english`.  For each group, choose the TW-preferred
 ///      canonical form from `glossary.preferred` when that preferred
@@ -94,9 +94,9 @@ pub fn compute_consistency_report(
         // Mixed usage: the canonical TW form must appear independently
         // somewhere in the document (i.e. NOT as a substring of an
         // already-flagged calque region). Cheap proxy: the canonical form is
-        // found at an offset that is not covered by any `from`-span issue. For
+        // found at an offset that is not covered by any from-span issue. For
         // the typical case where canonical and calque differ in characters,
-        // plain `text.contains` is sufficient because the calque span doesn't
+        // plain text.contains is sufficient because the calque span doesn't
         // contain the canonical form as a substring.
         if !text.contains(canonical.as_str()) {
             continue;
@@ -203,7 +203,7 @@ mod tests {
     #[test]
     fn groups_multiple_calques_for_same_english() {
         // Both 線程 and an alternative mainland form 線程數 share
-        // english="thread". (Simulated for the test — real ruleset may differ.)
+        // english="thread". (Simulated for the test: real ruleset may differ.)
         let text = "我們的線程很慢，線程數量太多。執行緒重構。";
         let issues = vec![
             cross_strait(9, "線程", "執行緒", "thread"),

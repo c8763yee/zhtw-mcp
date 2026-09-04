@@ -52,7 +52,7 @@
 
     #[test]
     fn already_correct_not_flagged() {
-        // "演算法" already contains the correct form — no issue.
+        // "演算法" already contains the correct form: no issue.
         let scanner = Scanner::new(algorithm_rule(), vec![]);
         let issues = scanner.scan("這個演算法很好用").issues;
         assert_eq!(issues.len(), 0);
@@ -103,7 +103,7 @@
 
     #[test]
     fn cn_quotes_all_opening_fixed_by_pairing() {
-        // Both quotes are \u{201c} (opening) — pairing fix should make the
+        // Both quotes are \u{201c} (opening): pairing fix should make the
         // second one a closing 」.
         let scanner = Scanner::new(quote_rules(), vec![]);
         let issues = scanner.scan("他說\u{201c}你好\u{201c}").issues;
@@ -114,8 +114,8 @@
 
     #[test]
     fn cn_quotes_all_closing_fixed_by_pairing() {
-        // Both quotes are \u{201d} (closing) — pairing fix should make the
-        // first one an opening 「.
+        // Both quotes are \u{201d} (closing): pairing fix should make the first
+        // one an opening 「.
         let scanner = Scanner::new(quote_rules(), vec![]);
         let issues = scanner.scan("他說\u{201d}你好\u{201d}").issues;
         assert_eq!(issues.len(), 2);
@@ -134,8 +134,8 @@
 
     #[test]
     fn cn_quotes_reversed_pair_fixed() {
-        // Closing before opening: \u{201d}...\u{201c} — balanced count but
-        // wrong order. Pairing fix should correct to 「...」.
+        // Closing before opening: \u{201d}...\u{201c}, balanced count but wrong
+        // order. Pairing fix should correct to 「...」.
         let scanner = Scanner::new(quote_rules(), vec![]);
         let issues = scanner.scan("他說\u{201d}你好\u{201c}").issues;
         assert_eq!(issues.len(), 2);
@@ -153,7 +153,7 @@
     #[test]
     fn wrong_repeated_in_correct_form() {
         // wrong="A" appears twice in correct="ABA" (at index 0 and 2). Text
-        // "ABA" is the correct form — neither "A" should be flagged.
+        // "ABA" is the correct form: neither "A" should be flagged.
         let rules = vec![SpellingRule::new("A", vec!["ABA".into()], RuleType::Typo)];
         let scanner = Scanner::new(rules, vec![]);
         let issues = scanner.scan("ABA").issues;
@@ -393,7 +393,7 @@
 
     #[test]
     fn punct_period_after_cjk_closing_quote() {
-        // 」(U+300D) is CJK punctuation — should count as CJK context.
+        // 」(U+300D) is CJK punctuation: should count as CJK context.
         let scanner = empty_scanner();
         let issues = scanner.scan("他說「你好」.").issues;
         assert_eq!(issues.len(), 1);
@@ -712,7 +712,7 @@
 
     #[test]
     fn markdown_frontmatter_values_are_scanned() {
-        // Frontmatter VALUES are now scanned (key+colon and `---` fences are
+        // Frontmatter VALUES are now scanned (key+colon and "---" fences are
         // still excluded). This catches lint issues in title/description that
         // were previously hidden.
         let scanner = Scanner::new(sample_spelling_rules(), vec![]);
@@ -1110,7 +1110,7 @@
     #[test]
     fn dunhao_not_triggered_for_two_items() {
         let scanner = Scanner::new(vec![], vec![]);
-        // Only two items — not enough for a list heuristic.
+        // Only two items: not enough for a list heuristic.
         let issues = scanner.scan("紅，藍").issues;
         let dunhao: Vec<_> = issues
             .iter()
@@ -1241,7 +1241,7 @@
 
     #[test]
     fn cn_curly_quotes_skip_english_smart_quotes() {
-        // English smart quotes should NOT be flagged — no CJK context.
+        // English smart quotes should NOT be flagged: no CJK context.
         let scanner = Scanner::new(vec![], vec![]);
         let issues = scanner.scan("\u{201c}Hello,\u{201d} she said.").issues;
         let quote_issues: Vec<_> = issues
@@ -1284,7 +1284,7 @@
 
     #[test]
     fn cn_curly_single_quote_skip_possessive_near_cjk() {
-        // "Python's 語法" — the 's is an English possessive, NOT a CN quote,
+        // "Python's 語法": the 's is an English possessive, NOT a CN quote,
         // even though CJK text is nearby. The ASCII letter guard must fire.
         let scanner = Scanner::new(vec![], vec![]);
         let issues = scanner.scan("Python\u{2019}s 語法").issues;
@@ -1301,7 +1301,7 @@
 
     #[test]
     fn cn_curly_single_quote_skip_contraction_near_cjk() {
-        // "中文 don't worry" — contraction near CJK must not be flagged.
+        // "中文 don't worry": contraction near CJK must not be flagged.
         let scanner = Scanner::new(vec![], vec![]);
         let issues = scanner.scan("中文 don\u{2019}t worry").issues;
         let quote_issues: Vec<_> = issues
@@ -1317,7 +1317,7 @@
 
     #[test]
     fn cn_curly_single_quotes_fire_when_wrapping_cjk() {
-        // '\u{2018}CJK\u{2019}' with NO ASCII letters adjacent — should fire.
+        // '\u{2018}CJK\u{2019}' with NO ASCII letters adjacent: should fire.
         let scanner = Scanner::new(vec![], vec![]);
         let issues = scanner.scan("他說\u{2018}你好\u{2019}").issues;
         assert_eq!(issues.len(), 2);
@@ -1671,27 +1671,27 @@
     #[test]
     fn ellipsis_correct_double_u2026() {
         let scanner = empty_scanner();
-        // Two consecutive … is the correct MoE form — no issue.
+        // Two consecutive … is the correct MoE form: no issue.
         assert!(scanner.scan("等一下……再說").issues.is_empty());
     }
 
     #[test]
     fn ellipsis_ascii_dots_no_cjk() {
         let scanner = empty_scanner();
-        // ASCII dots without adjacent CJK — no issue (could be English).
+        // ASCII dots without adjacent CJK: no issue (could be English).
         assert!(scanner.scan("wait...").issues.is_empty());
     }
 
     #[test]
     fn ellipsis_ascii_dots_in_code() {
         let scanner = empty_scanner();
-        // Inside backtick code — excluded.
+        // Inside backtick code: excluded.
         assert!(scanner.scan("看 `...` 的說明").issues.is_empty());
     }
 
     #[test]
     fn ellipsis_math_notation_not_flagged() {
-        // f(x) = ... — math notation; should not be flagged.
+        // f(x) = ... is math notation; should not be flagged.
         let scanner = empty_scanner();
         assert!(
             scanner.scan("函數 f(x) = ... 的定義").issues.is_empty(),
@@ -1701,7 +1701,7 @@
 
     #[test]
     fn ellipsis_code_comment_not_flagged() {
-        // // comment ... — code comment; should not be flagged.
+        // // comment ... is a code comment; should not be flagged.
         let scanner = empty_scanner();
         assert!(
             scanner.scan("// 其他程式碼 ...").issues.is_empty(),
@@ -1731,7 +1731,7 @@
 
     #[test]
     fn toc_dot_leader_not_flagged() {
-        // 第一章........1 — dot leader before page number; must not fire
+        // 第一章........1: dot leader before page number; must not fire
         // ellipsis rule.
         let scanner = empty_scanner();
         assert!(
@@ -1746,7 +1746,7 @@
 
     #[test]
     fn tilde_unary_approximation_not_flagged() {
-        // 約 ~10 分鐘 — unary ~N is an approximation prefix, not a range.
+        // 約 ~10 分鐘: unary ~N is an approximation prefix, not a range.
         let scanner = Scanner::new(vec![], vec![]);
         let issues = scanner.scan("約 ~10 分鐘可完成。").issues;
         let tildes: Vec<_> = issues.iter().filter(|i| i.found == "~").collect();
@@ -1758,7 +1758,7 @@
 
     #[test]
     fn tilde_range_still_flagged() {
-        // 一~十 — both sides CJK → genuine range indicator, must still fire.
+        // 一~十: both sides CJK → genuine range indicator, must still fire.
         let scanner = Scanner::new(vec![], vec![]);
         let issues = scanner.scan("範圍一~十。").issues;
         let tildes: Vec<_> = issues.iter().filter(|i| i.found == "~").collect();
@@ -1784,7 +1784,7 @@
 
     #[test]
     fn quote_hierarchy_balanced_primary() {
-        // Properly balanced 「...」 — no issues.
+        // Properly balanced 「...」: no issues.
         let scanner = empty_scanner();
         let issues = scanner.scan("他說「你好」再見").issues;
         let hierarchy: Vec<_> = issues
@@ -1803,7 +1803,7 @@
 
     #[test]
     fn quote_hierarchy_balanced_nested() {
-        // Properly nested 「...『...』...」 — no issues.
+        // Properly nested 「...『...』...」: no issues.
         let scanner = empty_scanner();
         let issues = scanner.scan("他說「她說『你好』了」再見").issues;
         let hierarchy: Vec<_> = issues
@@ -1848,7 +1848,7 @@
 
     #[test]
     fn quote_hierarchy_interleaved() {
-        // Interleaved: 「...『...」...』 — both mismatches flagged.
+        // Interleaved: 「...『...」...』, both mismatches flagged.
         let scanner = empty_scanner();
         let issues = scanner.scan("他「她『你好」世界』再見").issues;
         let hierarchy: Vec<_> = issues
@@ -1863,7 +1863,7 @@
 
     #[test]
     fn quote_hierarchy_secondary_at_top_level() {
-        // 『...』 not inside 「...」 — secondary without primary.
+        // 『...』 not inside 「...」: secondary without primary.
         let scanner = empty_scanner();
         let issues = scanner.scan("他說『你好』再見").issues;
         let hierarchy: Vec<_> = issues
@@ -1879,7 +1879,7 @@
 
     #[test]
     fn quote_hierarchy_book_title_balanced() {
-        // 《...》 inside 「...」 with prose — valid.
+        // 《...》 inside 「...」 with prose: valid.
         let scanner = empty_scanner();
         let issues = scanner.scan("他說「我讀了《哈利波特》」再見").issues;
         let hierarchy: Vec<_> = issues
@@ -1898,7 +1898,7 @@
 
     #[test]
     fn quote_hierarchy_book_title_url_balanced() {
-        // 《[title](url)》 — with the old \S+ URL regex the 》 was swallowed
+        // 《[title](url)》: with the old \S+ URL regex the 》 was swallowed
         // into the excluded zone, causing a spurious "unclosed 《" diagnostic.
         // The fix is RE_URL using [^\s「」『』《》]+, which stops before 》 so
         // the quote checker sees a balanced pair.
@@ -1955,7 +1955,7 @@
 
     #[test]
     fn quote_hierarchy_multi_depth() {
-        // Triple nesting: 「...『...「...」...』...」 — valid in MoE.
+        // Triple nesting: 「...『...「...」...』...」, valid in MoE.
         let scanner = empty_scanner();
         let issues = scanner.scan("「外層『中層「內層」中層』外層」").issues;
         let hierarchy: Vec<_> = issues
@@ -1994,7 +1994,7 @@
 
     #[test]
     fn markdown_image_exclamation_not_flagged() {
-        // ![alt](url) — the ! is part of Markdown image syntax, not prose.
+        // ![alt](url): the ! is part of Markdown image syntax, not prose.
         let scanner = Scanner::new(vec![], vec![]);
         let md = "詳見圖例 ![示意圖](figure.png) 所示。";
         let issues = scanner.scan(md).issues;

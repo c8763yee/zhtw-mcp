@@ -1,9 +1,9 @@
 // Chinese type detection module.
 //
-// Counts how many characters in the input belong to a simplified-only set vs.
-// a traditional-only set (both derived from
-// https://github.com/nickdrewe/traditional-or-simplified). Whichever side has
-// a higher count wins; ties and zero-count results yield Unknown.
+// Counts how many characters in the input belong to a simplified-only set vs. a
+// traditional-only set (both derived from
+// https://github.com/nickdrewe/traditional-or-simplified). Whichever side has a
+// higher count wins; ties and zero-count results yield Unknown.
 //
 // Note: simplified membership is checked first, so a character present in both
 // sets is counted as simplified only.

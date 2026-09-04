@@ -169,7 +169,8 @@ pub(crate) fn google_translate_raw(
     let body: serde_json::Value =
         serde_json::from_str(&body_str).map_err(|e| TranslateError::Parse(e.to_string()))?;
 
-    // Response format: [[["translated text","source text",null,null,N], ...], ...]
+    // Response format: [[["translated text","source text",null,null,N], ...],
+    // ...]
     let mut result = String::new();
     if let Some(outer) = body.as_array() {
         if let Some(inner) = outer.first().and_then(|v| v.as_array()) {
@@ -183,7 +184,7 @@ pub(crate) fn google_translate_raw(
         }
     }
 
-    // #4: Detect endpoint shape change — valid JSON but no translated fragments.
+    // #4: Detect endpoint shape change, valid JSON but no translated fragments.
     if result.is_empty() {
         return Err(TranslateError::Parse(
             "response JSON had no translated text fragments".into(),
@@ -296,9 +297,9 @@ pub fn calibrate_issues(text: &str, issues: &mut [Issue]) -> CalibrateResult {
         return result;
     }
 
-    // Collect unique context sentences for issues that have english fields.
-    // Map each issue index to its context segment index.
-    // #6: Use HashMap<String, usize> instead of HashSet + position() scan.
+    // Collect unique context sentences for issues that have english fields. Map
+    // each issue index to its context segment index. #6: Use HashMap<String,
+    // usize> instead of HashSet + position() scan.
     let mut segments: Vec<String> = Vec::new();
     let mut segment_map: HashMap<String, usize> = HashMap::new();
     let mut issue_to_segment: Vec<Option<usize>> = Vec::with_capacity(issues.len());
@@ -329,11 +330,11 @@ pub fn calibrate_issues(text: &str, issues: &mut [Issue]) -> CalibrateResult {
         return result;
     }
 
-    // #5: Cap payload size.  If the joined payload exceeds MAX_PAYLOAD_BYTES,
-    // truncate to the segments that fit.  Issues referencing truncated segments
-    // will get anchor_match = None (fail-open).
-    // Also cap individual segments: a single oversized context must not blow
-    // past the URL limit and disable calibration for the entire batch.
+    // #5: Cap payload size. If the joined payload exceeds MAX_PAYLOAD_BYTES,
+    // truncate to the segments that fit. Issues referencing truncated segments
+    // will get anchor_match = None (fail-open). Also cap individual segments: a
+    // single oversized context must not blow past the URL limit and disable
+    // calibration for the entire batch.
     let max_segment_bytes = MAX_PAYLOAD_BYTES / 2; // no single segment > half budget
     let max_segments = {
         let mut total = 0usize;
@@ -352,10 +353,10 @@ pub fn calibrate_issues(text: &str, issues: &mut [Issue]) -> CalibrateResult {
     };
 
     // #2: Use sentinel markers instead of bare \n for segment delimiting.
-    // Format: "###SEG0\n<segment0>\n###SEG1\n<segment1>\n..."
-    // After translation, find markers to recover per-segment text.
-    // Note: if user text literally contains "###SEG\d+", sentinel parsing could
-    // be corrupted.  Acceptable risk — this pattern is vanishingly rare in zh-TW.
+    // Format: "###SEG0\n<segment0>\n###SEG1\n<segment1>\n..." After
+    // translation, find markers to recover per-segment text. Note: if user text
+    // literally contains "###SEG\d+", sentinel parsing could be corrupted.
+    // Acceptable risk: this pattern is vanishingly rare in zh-TW.
     let mut payload = String::new();
     let mut truncated_segments: HashSet<usize> = HashSet::new();
     for (i, seg) in segments.iter().enumerate() {
@@ -365,9 +366,11 @@ pub fn calibrate_issues(text: &str, issues: &mut [Issue]) -> CalibrateResult {
         if !payload.is_empty() {
             payload.push('\n');
         }
+
         // Truncate oversized segments at a char boundary to stay within budget.
-        // Truncated segments get anchor_match = None (the anchor word might have
-        // been beyond the truncation point — evaluating would create false negatives).
+        // Truncated segments get anchor_match = None (the anchor word might
+        // have been beyond the truncation point: evaluating would create false
+        // negatives).
         let truncated = if seg.len() > max_segment_bytes {
             truncated_segments.insert(i);
             &seg[..seg.floor_char_boundary(max_segment_bytes)]
@@ -413,8 +416,9 @@ pub fn calibrate_issues(text: &str, issues: &mut [Issue]) -> CalibrateResult {
             None => continue, // no english field → anchor_match stays None
         };
 
-        // Segment was dropped (payload cap) or individually truncated → no signal.
-        // Truncated segments might have lost the anchor word beyond the cut point.
+        // Segment was dropped (payload cap) or individually truncated → no
+        // signal. Truncated segments might have lost the anchor word beyond the
+        // cut point.
         if seg_idx >= max_segments || truncated_segments.contains(&seg_idx) {
             continue;
         }
@@ -433,7 +437,8 @@ pub fn calibrate_issues(text: &str, issues: &mut [Issue]) -> CalibrateResult {
         // #1: Filter to content words only (no stopwords, no single chars).
         let anchors = content_anchor_words(&english);
         if anchors.is_empty() {
-            // All anchor words were stopwords → no signal, not a false negative.
+            // All anchor words were stopwords → no signal, not a false
+            // negative.
             continue;
         }
 
@@ -486,8 +491,8 @@ fn parse_sentinel_segments(translation: &str, expected_count: usize) -> Vec<Stri
     let mut result = vec![String::new(); expected_count];
 
     if markers.is_empty() {
-        // No markers found — Google may have stripped them.  Fall back to
-        // newline splitting for backward compat (best-effort).
+        // No markers found: Google may have stripped them. Fall back to newline
+        // splitting for backward compat (best-effort).
         for (i, line) in translation.split('\n').enumerate() {
             if i < expected_count {
                 result[i] = line.trim().to_string();
@@ -531,6 +536,7 @@ mod tests {
         assert!(!super::disabled_by(None));
         assert!(!super::disabled_by(Some(OsStr::new(""))));
         assert!(!super::disabled_by(Some(OsStr::new("0"))));
+
         // Anything else refuses. "false" reads as off to a human but is not a
         // documented off-value, and guessing wrong here would open the socket.
         for on in ["1", "true", "yes", "0no", "00"] {
@@ -564,7 +570,8 @@ mod tests {
         assert!(tokens.contains(&"s".to_string()));
     }
 
-    // #3: Context extraction now counts chars, not bytes, and respects CJK punctuation.
+    // #3: Context extraction now counts chars, not bytes, and respects CJK
+    // punctuation.
     #[test]
     fn extract_context_respects_cjk_sentence_punctuation() {
         let text = "第一句話。這個軟件很好用。第三句話在這裡。";
@@ -581,8 +588,8 @@ mod tests {
 
     #[test]
     fn extract_context_counts_chars_not_bytes() {
-        // 50 CJK characters = 150 bytes.  With ±40 char window, context
-        // should be bounded around ~40 chars each direction, not 40 bytes.
+        // 50 CJK characters = 150 bytes. With ±40 char window, context should
+        // be bounded around ~40 chars each direction, not 40 bytes.
         let text: String = (0..50).map(|_| '測').collect();
         let ctx = extract_issue_context(&text, text.len() / 2);
         let char_count = ctx.chars().count();
@@ -708,7 +715,7 @@ mod tests {
     // #1: Anchor with only stopwords should produce None, not false positive.
     #[test]
     fn calibrate_stopword_only_anchor_yields_none() {
-        // "if and only if" — all stopwords.  Should not produce a false match.
+        // "if and only if": all stopwords.  Should not produce a false match.
         let _issues = [Issue::new(
             0,
             6,
@@ -718,6 +725,7 @@ mod tests {
             crate::rules::ruleset::Severity::Warning,
         )
         .with_english("if and only if")];
+
         // We can't call the real API in unit tests, but we can verify the
         // content_anchor_words logic that gates the match.
         let anchors = content_anchor_words("if and only if");

@@ -181,7 +181,7 @@ pub struct CompiledSpellingDb {
     /// cold resource read, which is more moving parts than 100 KB is worth.
     pub spelling_rules: Vec<SpellingRule>,
     /// Precomputed suggestions per rule.  Arc avoids per-issue clone
-    /// during inflation — only a reference count bump per survivor.
+    /// during inflation: only a reference count bump per survivor.
     pub spelling_suggestions: Vec<Arc<[String]>>,
     /// Pre-interned context strings per rule.  Arc bump during inflation.
     pub spelling_contexts: Vec<Option<Arc<str>>>,
@@ -199,7 +199,7 @@ pub struct CompiledSpellingDb {
     /// under the cold-start budget.
     pub spelling_context_suggestions: Vec<Option<CompiledContextSelector>>,
     /// Per-rule editorial confidence.  Plain copy at inflation
-    /// time — `EditorialConfidence` is `Copy`, so no Arc needed.
+    /// time: `EditorialConfidence` is `Copy`, so no Arc needed.
     pub spelling_editorial_confidence: Vec<Option<crate::rules::ruleset::EditorialConfidence>>,
     /// Per-rule positive clue IDs into the clue AC pattern list.
     pub rule_pos_clue_ids: Vec<Option<Vec<u16>>>,
@@ -644,8 +644,8 @@ fn inflate_spelling_issues_inner(
             let sr = &db.spelling_rules[idx];
 
             // For deletion rules, the span may have been extended to absorb
-            // trailing punctuation. Use `rule.from.len()` for `found` so users
-            // see the phrase to delete, not the absorbed punctuation.
+            // trailing punctuation. Use rule.from.len() for found so users see
+            // the phrase to delete, not the absorbed punctuation.
             let found_len = if sr.has_deletion_sentinel() {
                 sr.from.len()
             } else {
@@ -699,7 +699,7 @@ pub struct ProfileFilter {
 }
 
 impl ProfileFilter {
-    /// No filtering — include all rule types.
+    /// No filtering: include all rule types.
     pub fn none() -> Self {
         Self {
             exclude_variant: false,
@@ -773,7 +773,7 @@ impl GuardRules {
     /// profile that drops `ai_filler` from the lexical automaton must not also
     /// silently empty a detector that has its own gate.
     pub fn build(rules: &[SpellingRule]) -> Self {
-        // Same order as prepare_rules: drop disabled, then last-wins by `from`.
+        // Same order as prepare_rules: drop disabled, then last-wins by from.
         // Both sides have to agree on which duplicate survives, or a phrase
         // could be dropped from the lexical automaton by one rule and picked up
         // here by another, or by neither.
@@ -833,11 +833,11 @@ impl GuardRules {
 fn prepare_rules(spelling_rules: Vec<SpellingRule>, filter: &ProfileFilter) -> Vec<SpellingRule> {
     // Filter disabled first, then deduplicate (last-wins), THEN apply profile
     // filter. Profile filtering must run after dedup so it cannot change which
-    // duplicate survives for the same `from` key.
+    // duplicate survives for the same from key.
     let mut spelling_rules: Vec<SpellingRule> =
         spelling_rules.into_iter().filter(|r| !r.disabled).collect();
 
-    // Deduplicate by `from` key (last wins; overrides come after embedded).
+    // Deduplicate by from key (last wins; overrides come after embedded).
     // Borrow the keys instead of cloning ~1.8k Strings, and mark-then-retain
     // instead of repeated O(n) Vec::remove.
     {
@@ -1024,9 +1024,9 @@ type Automata = (
 fn build_automata(spelling_rules: &[SpellingRule]) -> Automata {
     let spelling_patterns: Vec<&str> = spelling_rules.iter().map(|r| r.from.as_str()).collect();
 
-    // Absorption patterns: exception phrases and superstring `to` forms
-    // injected into the AC so LeftmostLongest suppresses shorter `from`
-    // matches. Indices >= spelling_rules.len() act as sentinels.
+    // Absorption patterns: exception phrases and superstring to forms injected
+    // into the AC so LeftmostLongest suppresses shorter from matches. Indices
+    // >= spelling_rules.len() act as sentinels.
     let absorber_strings: Vec<String> = {
         let from_set: FxHashSet<&str> = spelling_patterns.iter().copied().collect();
         let mut candidates: Vec<(String, &str)> = Vec::new();
@@ -1054,7 +1054,7 @@ fn build_automata(spelling_rules: &[SpellingRule]) -> Automata {
         }
 
         // Index froms by first char. Both shadow conditions below --
-        // containment (`absorber.contains(f)`) and right-boundary overlap (a
+        // containment (absorber.contains(f)) and right-boundary overlap (a
         // suffix of the absorber is a prefix of f) -- require f's first char to
         // occur in the absorber. So only froms bucketed under a char the
         // absorber actually contains can shadow it; the rest are skipped. Exact
@@ -1069,14 +1069,14 @@ fn build_automata(spelling_rules: &[SpellingRule]) -> Automata {
             }
         }
 
-        // Reject absorbers that would shadow a different rule's `from`.
+        // Reject absorbers that would shadow a different rule's from.
         candidates
             .into_iter()
             .filter(|(absorber, orig_from)| {
-                // An empty `from` (deduped, so at most one) has no first char
-                // and is thus unbucketed, but it is a substring of every
-                // absorber -- so unless it *is* orig_from, it shadows
-                // unconditionally, exactly as the old full scan did.
+                // An empty from (deduped, so at most one) has no first char and
+                // is thus unbucketed, but it is a substring of every absorber
+                // -- so unless it *is* orig_from, it shadows unconditionally,
+                // exactly as the old full scan did.
                 if has_empty_from && !orig_from.is_empty() {
                     return false;
                 }

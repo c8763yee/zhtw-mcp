@@ -1,4 +1,5 @@
-// Simplified → Traditional Chinese conversion (replaces external OpenCC dependency).
+// Simplified → Traditional Chinese conversion (replaces external OpenCC
+// dependency).
 //
 // Pipeline (mirrors OpenCC s2t + TWVariants):
 //   1. STPhrases: longest-match phrase substitution via daachorse AC
@@ -22,7 +23,8 @@ use daachorse::{CharwiseDoubleArrayAhoCorasickBuilder, MatchKind as DaacMatchKin
 
 /// Compiled SC→TC converter. Build once, reuse across calls.
 pub struct S2TConverter {
-    /// Phrase AC automaton (longest-match). Match value = index into `phrase_targets`.
+    /// Phrase AC automaton (longest-match). Match value = index into
+    /// `phrase_targets`.
     phrase_ac: daachorse::CharwiseDoubleArrayAhoCorasick<u32>,
     /// Target strings for phrase matches, parallel to AC pattern indices.
     /// Pre-normalized: TWVariants already applied at build time, so phrase
@@ -50,10 +52,10 @@ impl S2TConverter {
         let char_map: HashMap<char, char> = s2t_data::ST_CHARACTERS.iter().copied().collect();
         let tw_variant_map: HashMap<char, char> = s2t_data::TW_VARIANTS.iter().copied().collect();
 
-        // Build phrase targets vec and AC patterns from static data.
-        // Pre-apply TWVariants to phrase targets so they are in final TW form.
-        // This lets us protect phrase output ranges from the TWVariants round
-        // without losing variant normalization (it is baked in).
+        // Build phrase targets vec and AC patterns from static data. Pre-apply
+        // TWVariants to phrase targets so they are in final TW form. This lets
+        // us protect phrase output ranges from the TWVariants round without
+        // losing variant normalization (it is baked in).
         let len = s2t_data::ST_PHRASES.len();
         let mut phrase_targets: Vec<String> = Vec::with_capacity(len);
         let mut patvals: Vec<(&str, u32)> = Vec::with_capacity(len);
@@ -84,14 +86,17 @@ impl S2TConverter {
     /// Convert Simplified Chinese text to Traditional Chinese (Taiwan variant).
     ///
     /// Protected-zone tracking: phrase substitutions produce pre-normalized
-    /// output (TWVariants baked in at build time). Their byte ranges in the output
-    /// buffer are recorded as protected zones. The TWVariants pass skips characters
-    /// inside protected zones, preventing double-conversion while still normalizing
-    /// character-level output.
+    /// output (TWVariants baked in at build time). Their byte ranges in the
+    /// output buffer are recorded as protected zones. The TWVariants pass skips
+    /// characters inside protected zones, preventing double-conversion while
+    /// still normalizing character-level output.
     pub fn convert(&self, input: &str) -> String {
-        // Pass 1+2 (interleaved): phrase AC matches + char-level fallback for gaps.
+        // Pass 1+2 (interleaved): phrase AC matches + char-level fallback for
+        // gaps.
         let mut out = String::with_capacity(input.len());
-        // Protected zones: sorted, non-overlapping byte ranges of phrase outputs.
+
+        // Protected zones: sorted, non-overlapping byte ranges of phrase
+        // outputs.
         let mut protected: Vec<(usize, usize)> = Vec::new();
         let mut last_byte = 0;
 
@@ -104,7 +109,8 @@ impl S2TConverter {
                 out.push(self.convert_char(ch));
             }
 
-            // Record protected zone and substitute phrase (already pre-normalized).
+            // Record protected zone and substitute phrase (already
+            // pre-normalized).
             let zone_start = out.len();
             out.push_str(&self.phrase_targets[mat.value() as usize]);
             protected.push((zone_start, out.len()));
@@ -117,8 +123,8 @@ impl S2TConverter {
             out.push(self.convert_char(ch));
         }
 
-        // Pass 3: TW variant normalization, skipping protected zones.
-        // Phrase outputs are already in final form; only char-level output needs this.
+        // Pass 3: TW variant normalization, skipping protected zones. Phrase
+        // outputs are already in final form; only char-level output needs this.
         if self.tw_variant_map.is_empty() {
             return out;
         }
@@ -131,8 +137,9 @@ impl S2TConverter {
             while zone_idx < protected.len() && protected[zone_idx].1 <= byte_pos {
                 zone_idx += 1;
             }
-            // After advancing, current zone (if any) has end > byte_pos,
-            // so we only need to check whether we are past its start.
+
+            // After advancing, current zone (if any) has end > byte_pos, so we
+            // only need to check whether we are past its start.
             let in_zone = zone_idx < protected.len() && byte_pos >= protected[zone_idx].0;
             if in_zone {
                 result.push(ch);
@@ -185,12 +192,14 @@ mod tests {
     #[test]
     fn phrase_conversion() {
         let c = converter();
-        // STPhrases handles context-dependent multi-char mappings.
-        // Note: 操作系统→操作系統 (char-level only, no TWPhrases).
-        // 作業系統 is a TWPhrases mapping that zhtw-mcp handles separately.
+
+        // STPhrases handles context-dependent multi-char mappings. Note:
+        // 操作系统→操作系統 (char-level only, no TWPhrases). 作業系統 is a
+        // TWPhrases mapping that zhtw-mcp handles separately.
         assert_eq!(c.convert("操作系统"), "操作系統");
-        // 内存→內存 (char-level only). 記憶體 is a TWPhrases mapping
-        // handled by zhtw-mcp's cross_strait rules, not by s2t.
+
+        // 内存→內存 (char-level only). 記憶體 is a TWPhrases mapping handled by
+        // zhtw-mcp's cross_strait rules, not by s2t.
         assert_eq!(c.convert("内存"), "內存");
         // 一丝不挂→一絲不掛 (in STPhrases: phrase-level conversion).
         assert_eq!(c.convert("一丝不挂"), "一絲不掛");
@@ -280,6 +289,7 @@ mod tests {
     #[test]
     fn ambiguous_chars_resolve_by_phrase_not_by_guess() {
         let c = converter();
+
         // 复 has three readings (復 restore, 複 duplicate, 覆 cover). Only the
         // phrase table may choose between them.
         assert_eq!(c.convert("复习"), "複習");
@@ -288,6 +298,7 @@ mod tests {
         // EXTRA_PHRASES additions: absent from OpenCC, hand-verified here.
         assert_eq!(c.convert("复盘"), "復盤");
         assert_eq!(c.convert("复联"), "復聯");
+
         // Uncovered contexts keep 复 rather than guessing. Leaving a visible
         // Simplified residue beats silently emitting 復矩陣 for 複矩陣: a wrong
         // Traditional character reads as correct and nothing downstream flags
@@ -300,6 +311,7 @@ mod tests {
     #[test]
     fn os_terminology() {
         let c = converter();
+
         // s2t (char-level) should NOT produce the same wrong results as s2twp.
         // 进程 → 進程 (not 程序, which is what s2twp TWPhrases does)
         assert_eq!(c.convert("进程"), "進程");
@@ -312,7 +324,9 @@ mod tests {
     #[test]
     fn identity_already_correct_tw_terms() {
         let c = converter();
-        // These are correct zh-TW terms. Round-trip must produce identical output.
+
+        // These are correct zh-TW terms. Round-trip must produce identical
+        // output.
         assert_eq!(c.convert("演算法"), "演算法");
         assert_eq!(c.convert("執行緒"), "執行緒");
         assert_eq!(c.convert("記憶體"), "記憶體");
@@ -333,10 +347,12 @@ mod tests {
     #[test]
     fn no_double_conversion_on_tw_variants_targets() {
         let c = converter();
+
         // Phrase outputs with TWVariant source chars must be pre-normalized,
         // not double-converted. '裏' in phrase targets → '裡' (baked in).
         // Standalone '裏' (char-level) must still normalize to '裡'.
         assert_eq!(c.convert("裏"), "裡");
+
         // A phrase whose target contained '裏' should output '裡' directly.
         // '一地里' → STPhrases → '一地裡' (pre-normalized from '一地裏').
         assert_eq!(c.convert("一地里"), "一地裡");
@@ -345,6 +361,7 @@ mod tests {
     #[test]
     fn mixed_phrase_and_char_adjacent() {
         let c = converter();
+
         // Text adjacent to a phrase replacement must still be converted.
         // '万众一心' is in STPhrases; adjacent SC chars must be char-converted.
         let result = c.convert("为万众一心而奋斗");
@@ -357,15 +374,17 @@ mod tests {
     #[test]
     fn protected_zones_do_not_suppress_adjacent_char_conversion() {
         let c = converter();
+
         // Char-level output OUTSIDE protected zones must still get TWVariants.
-        // '着' at char level → STCharacters identity → TWVariants → '著'
-        // This must NOT be suppressed by nearby phrase zones.
+        // '着' at char level → STCharacters identity → TWVariants → '著'. That
+        // must NOT be suppressed by nearby phrase zones.
         assert_eq!(c.convert("着"), "著");
         // Mix: phrase match + gap with TWVariant char.
         let input = "一丝不挂着";
         let result = c.convert(input);
-        // '一丝不挂' is a phrase → '一絲不掛' (protected)
-        // '着' is in the gap → TWVariants → '著'
+
+        // '一丝不挂' is a phrase → '一絲不掛' (protected). '着' is in the gap →
+        // TWVariants → '著'.
         assert!(result.ends_with('著'));
     }
 }

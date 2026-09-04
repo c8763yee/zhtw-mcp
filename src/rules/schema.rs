@@ -29,8 +29,8 @@
 //     stay compatible with.  Order still has to be internally consistent, which
 //     it is by construction.
 //
-// ruleset.rs re-exports everything here, so
-// `crate::rules::ruleset::SpellingRule` keeps resolving.
+// ruleset.rs re-exports everything here, so crate::rules::ruleset::SpellingRule
+// keeps resolving.
 
 use serde::{Deserialize, Serialize};
 

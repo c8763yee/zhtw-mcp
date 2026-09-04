@@ -1,7 +1,7 @@
 // Case rule scan using Aho-Corasick (case-insensitive).
 //
-// Checks that terms like "JavaScript", "TypeScript", "API" are correctly
-// cased, rejecting matches that are already in canonical or alternative form.
+// Checks that terms like "JavaScript", "TypeScript", "API" are correctly cased,
+// rejecting matches that are already in canonical or alternative form.
 
 use crate::engine::excluded::{is_excluded, ByteRange};
 use crate::rules::ruleset::{Issue, IssueType, Severity};
@@ -34,7 +34,8 @@ impl Scanner {
             let found = &text[start..end];
             let rule = &self.case_rules[mat.pattern().as_usize()];
 
-            // Check if the matched text is already correct (canonical or alternative).
+            // Check if the matched text is already correct (canonical or
+            // alternative).
             if found == rule.term {
                 continue;
             }

@@ -10,9 +10,9 @@ use super::ruleset::{CaseRule, Issue, IssueType, Severity, SpellingRule};
 /// contract changes.
 ///
 /// History:
-///   1 — implicit (sled era, no version stored)
-///   2 — sled era: SpellingRule gained exceptions: Option<Vec<String>>
-///   3 — JSON-file overrides, sled removed
+///   1: implicit (sled era, no version stored)
+///   2: sled era, SpellingRule gained exceptions: Option<Vec<String>>
+///   3: JSON-file overrides, sled removed
 pub const SCHEMA_VERSION: u32 = 3;
 
 /// Acquire an exclusive advisory lock on a lockfile adjacent to the target
@@ -701,7 +701,7 @@ impl TranslationMemoryStore {
     }
 
     /// Import TM entries from a file. Merges with existing entries (dedup
-    /// by `found` only — latest decision per term wins).
+    /// by `found` only: latest decision per term wins).
     ///
     /// Returns `(added, updated)`.
     pub fn import(&mut self, src: &Path) -> Result<(usize, usize)> {
@@ -762,7 +762,7 @@ impl TranslationMemoryStore {
 }
 
 /// Build lookup index from TM entries. For duplicate `found` keys
-/// (hand-edited files), the last occurrence wins — matching the
+/// (hand-edited files), the last occurrence wins: matching the
 /// 'latest decision wins' semantics.
 fn build_tm_index(entries: &[TmEntry]) -> HashMap<String, usize> {
     let mut index: HashMap<String, usize> = HashMap::with_capacity(entries.len());

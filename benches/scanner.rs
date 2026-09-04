@@ -195,8 +195,8 @@ fn bench_apply_fixes(c: &mut Criterion) {
     let segmenter = Segmenter::from_rules(&ruleset.spelling_rules);
     let scanner = Scanner::new(ruleset.spelling_rules, ruleset.case_rules);
 
-    // Generate enough text to produce at least 50 issues.
-    // The base paragraph has ~8 flaggable terms, so 10KB should yield plenty.
+    // Generate enough text to produce at least 50 issues. The base paragraph
+    // has ~8 flaggable terms, so 10KB should yield plenty.
     let text = generate_text(10_240);
     let mut issues = scanner.scan_profiled_md(&text, Profile::Base, false).issues;
 
@@ -259,8 +259,9 @@ fn bench_scan_context_clues(c: &mut Criterion) {
     let ruleset = load_embedded_ruleset().expect("load embedded ruleset");
     let scanner = Scanner::new(ruleset.spelling_rules, ruleset.case_rules);
 
-    // Validate that the context-clue paragraph actually exercises clue resolution.
-    // At least 20% of issues on 10KB should have context_clues (the TODO target is ~30%).
+    // Validate that the context-clue paragraph actually exercises clue
+    // resolution. At least 20% of issues on 10KB should have context_clues (the
+    // TODO target is ~30%).
     {
         let check_text =
             CONTEXT_CLUE_PARAGRAPH.repeat((10_240 / CONTEXT_CLUE_PARAGRAPH.len()).max(1));
@@ -374,7 +375,8 @@ fn bench_post_scan_transforms(c: &mut Criterion) {
             })
             .collect();
 
-        // Simulate applied fixes (every 5th issue gets a fix with +3 byte delta).
+        // Simulate applied fixes (every 5th issue gets a fix with +3 byte
+        // delta).
         let applied_fixes: Vec<AppliedFix> = (0..count)
             .step_by(5)
             .map(|i| AppliedFix {
@@ -413,7 +415,9 @@ fn bench_post_scan_transforms(c: &mut Criterion) {
                         let remapped = remap_to_post_fix(issue.offset, black_box(&applied_fixes));
                         state_by_offset.entry(remapped).or_default().push(idx);
                     }
-                    // Simulate lookup for each remaining issue using post-fix offsets.
+
+                    // Simulate lookup for each remaining issue using post-fix
+                    // offsets.
                     let mut match_count = 0usize;
                     for issue in issues {
                         let remapped = remap_to_post_fix(issue.offset, black_box(&applied_fixes));
@@ -436,12 +440,12 @@ fn bench_post_scan_transforms(c: &mut Criterion) {
 
 // 8. Per-stage CPU attribution on 100KB input
 //
-// Measures each scan stage in isolation to determine where time is spent.
-// Uses ProfileConfig flags to enable/disable individual stages.
-// Note: baseline_no_checks (all-off) early-returns on zero issues, so it
-// excludes LineIndex construction.  LineIndex cost is benchmarked separately
-// in lineindex_100kb and is hidden inside stages that produce issues
-// (e.g. spelling_only).
+// Measures each scan stage in isolation to determine where time is spent. Uses
+// ProfileConfig flags to enable/disable individual stages. Note:
+// baseline_no_checks (all-off) early-returns on zero issues, so it excludes
+// LineIndex construction. LineIndex cost is benchmarked separately in
+// lineindex_100kb and is hidden inside stages that produce issues (e.g.
+// spelling_only).
 
 fn bench_cpu_attribution_100kb(c: &mut Criterion) {
     use zhtw_mcp::engine::scan::ContentType;
@@ -456,8 +460,8 @@ fn bench_cpu_attribution_100kb(c: &mut Criterion) {
     let excluded =
         zhtw_mcp::engine::scan::build_exclusions_for_content_type(&text, ContentType::Plain);
 
-    // All-off config: measures baseline overhead (detect_chinese_type +
-    // vec alloc + sort).  LineIndex is skipped (early-return on 0 issues).
+    // All-off config: measures baseline overhead (detect_chinese_type + vec
+    // alloc + sort). LineIndex is skipped (early-return on 0 issues).
     let cfg_none = ProfileConfig {
         document_genre: DocumentGenre::Casual,
         spelling: false,
@@ -586,9 +590,9 @@ fn bench_cpu_attribution_100kb(c: &mut Criterion) {
         });
     });
 
-    // Post-scan overhead: LineIndex construction + line/col lookups.
-    // This cost is hidden inside spelling_only (which produces issues)
-    // but absent from baseline_no_checks (which early-returns on 0 issues).
+    // Post-scan overhead: LineIndex construction + line/col lookups. This cost
+    // is hidden inside spelling_only (which produces issues) but absent from
+    // baseline_no_checks (which early-returns on 0 issues).
     group.bench_function("lineindex_100kb", |b| {
         use zhtw_mcp::engine::lineindex::{ColumnEncoding, LineIndex};
         // Pre-collect valid char-boundary offsets for lookup simulation.
@@ -658,7 +662,8 @@ fn bench_pipeline_breakdown(c: &mut Criterion) {
         });
     });
 
-    // Stage B: spelling eval only (includes bitmap + clue pre-scan + eval, NO sort/overlap/inflate).
+    // Stage B: spelling eval only (includes bitmap + clue pre-scan + eval, NO
+    // sort/overlap/inflate).
     group.bench_function("spelling_eval_raw", |b| {
         b.iter(|| {
             let n = scanner.bench_spelling_only_raw(black_box(&text), excluded, &cfg);
@@ -666,9 +671,9 @@ fn bench_pipeline_breakdown(c: &mut Criterion) {
         });
     });
 
-    // Stage C: sort + overlap resolution on pre-sort raw issues.
-    // Uses bench_collect_raw_issues to get issues BEFORE sort/overlap/inflate,
-    // so this benchmark measures the actual sort+overlap cost on realistic input.
+    // Stage C: sort + overlap resolution on pre-sort raw issues. Uses
+    // bench_collect_raw_issues to get issues BEFORE sort/overlap/inflate, so
+    // this benchmark measures the actual sort+overlap cost on realistic input.
     let raw_issues = scanner.bench_collect_raw_issues(&text, excluded, &cfg);
     group.bench_function("sort_and_overlap", |b| {
         b.iter_batched(
@@ -681,8 +686,9 @@ fn bench_pipeline_breakdown(c: &mut Criterion) {
         );
     });
 
-    // Stage D: inflate cost proxy -- measures the clone cost of suggestions/found
-    // by cloning the inflated issue vec (similar allocation pattern).
+    // Stage D: inflate cost proxy, which measures the clone cost of
+    // suggestions/found by cloning the inflated issue vec (similar allocation
+    // pattern).
     group.bench_function("issue_clone_cost", |b| {
         b.iter_batched(
             || raw_issues.clone(),

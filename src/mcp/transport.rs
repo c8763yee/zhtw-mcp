@@ -1,7 +1,7 @@
 // JSON-RPC framing for the RMCP stdio server.
 //
 // RMCP's own stdio transport reads unbounded lines, drops input its parser
-// rejects without a reply, and treats anything before `initialize` as a fatal
+// rejects without a reply, and treats anything before initialize as a fatal
 // handshake error that ends the process. This transport keeps the framing
 // contract this server has always had:
 //
@@ -11,7 +11,7 @@
 //   - valid JSON that is not a valid JSON-RPC request is answered -32600 with
 //     the id echoed, so the client can correlate it,
 //   - response-shaped messages are discarded in silence, per JSON-RPC 2.0,
-//   - a request before `initialize` is answered -32002 and the connection
+//   - a request before initialize is answered -32002 and the connection
 //     stays up.
 //
 // Everything past the envelope is RMCP's job.
@@ -23,7 +23,7 @@ use std::time::Duration;
 
 // Logging is deprecated by SEP-2577 but stays in the spec for now, and this
 // server's clients use it; the level is typed rather than stringly so the
-// filter, the wire, and `logging/setLevel` cannot disagree.
+// filter, the wire, and logging/setLevel cannot disagree.
 #[allow(deprecated)]
 use rmcp::model::LoggingLevel;
 use rmcp::model::RequestId as PeerRequestId;
@@ -253,9 +253,9 @@ impl Lifecycle {
     pub(crate) async fn drain_outbound(&self) {
         // Cloned into this future rather than borrowed, and it has to stay that
         // way: holding a sender across the await is what stops a concurrent
-        // `close()` from finishing its writer join before this resumes.
-        // Hoisting the clone out reintroduces the deadlock family this has
-        // already been bitten by twice.
+        // close() from finishing its writer join before this resumes. Hoisting
+        // the clone out reintroduces the deadlock family this has already been
+        // bitten by twice.
         let Some(outbound) = self
             .outbound
             .lock()
@@ -446,7 +446,7 @@ async fn write_outbound<W: AsyncWrite + Unpin>(
             failed = Some(error.kind());
 
             // Raised before the sender is woken. That wake can resume RMCP,
-            // which re-enters `receive`, and the read has to see the failure
+            // which re-enters receive, and the read has to see the failure
             // rather than park on a stdin that may never say anything again.
             lifecycle.mark_write_failed();
 
@@ -468,7 +468,7 @@ async fn write_outbound<W: AsyncWrite + Unpin>(
 pub fn stdio(lifecycle: Arc<Lifecycle>) -> StdioTransport {
     let (outbound, mut rx) = mpsc::unbounded_channel::<Outbound>();
 
-    // Writing happens here and nowhere else. RMCP polls `receive` inside a
+    // Writing happens here and nowhere else. RMCP polls receive inside a
     // select! and drops that future whenever another arm wins, which under a
     // stream of responses is most of the time. A write awaited inside it is
     // dropped with it, losing the reply outright, and a write dropped partway
@@ -579,9 +579,9 @@ async fn read_line<R: AsyncBufRead + Unpin>(
     let budget = (MAX_LINE_BYTES + 1).saturating_sub(raw.len()) as u64;
     reader.take(budget).read_until(b'\n', raw).await?;
 
-    // `read_until` stops at a delimiter, at end of input, or when the budget
-    // runs out, and its byte count does not say which. What distinguishes them
-    // is the buffer: a delimiter at the end, or the whole budget spent without
+    // read_until stops at a delimiter, at end of input, or when the budget runs
+    // out, and its byte count does not say which. What distinguishes them is
+    // the buffer: a delimiter at the end, or the whole budget spent without
     // one.
     if !raw.ends_with(b"\n") && raw.len() > MAX_LINE_BYTES {
         let recovered = drain_until_newline(reader).await?;
@@ -813,7 +813,7 @@ fn gate(lifecycle: &Lifecycle, request: &super::types::JsonRpcRequest) -> Gate {
         });
     }
     if method == "initialize" {
-        // A `logging` key in the client capabilities is this server's own
+        // A logging key in the client capabilities is this server's own
         // extension, and RMCP's typed capabilities drop it before the handler
         // ever sees it, so it is read here off the raw envelope.
         if request.params.pointer("/capabilities/logging").is_some() {
@@ -827,7 +827,7 @@ fn gate(lifecycle: &Lifecycle, request: &super::types::JsonRpcRequest) -> Gate {
     // it here for a malformed or unknown declaration answers "server not
     // initialized", which is both untrue and useless: the gate does not know
     // the version list, and that list is the entire point of the request. RMCP
-    // owns the `_meta` contract, so let it answer with the key it is missing or
+    // owns the _meta contract, so let it answer with the key it is missing or
     // with the revisions on offer. Forwarding does not open the gate; nothing
     // on this path marks the session initialized.
     if method == "server/discover" {
@@ -835,16 +835,16 @@ fn gate(lifecycle: &Lifecycle, request: &super::types::JsonRpcRequest) -> Gate {
     }
 
     // 2026-07-28 deleted the handshake: every request carries its own protocol
-    // declaration in `_meta`, so a client may open a connection and send a call
-    // on it without a preceding `initialize` or `server/discover`. The
-    // declaration is request-scoped: do not turn it into connection state.
+    // declaration in _meta, so a client may open a connection and send a call
+    // on it without a preceding initialize or server/discover. The declaration
+    // is request-scoped: do not turn it into connection state.
     //
     // What counts as a declaration is the revision table's business, not the
-    // framing layer's, so both questions are asked of `revisions`.
+    // framing layer's, so both questions are asked of revisions.
     if let Some(meta) = super::revisions::declaration(&request.params) {
         if super::revisions::is_self_declaring(meta) {
             // Same extension the handshake path reads, in the place this
-            // revision has for it. Wired here rather than left to `initialize`,
+            // revision has for it. Wired here rather than left to initialize,
             // which a client on this path never sends.
             if super::revisions::logging_opt_in(meta) {
                 lifecycle.enable_logs();
@@ -1214,8 +1214,8 @@ mod tests {
             queued.push(written);
         }
 
-        // `tx` stays alive on purpose. Both the lifecycle and the transport
-        // hold sender clones in the real thing, so the drain has to close the
+        // tx stays alive on purpose. Both the lifecycle and the transport hold
+        // sender clones in the real thing, so the drain has to close the
         // receiver itself; without that this waits forever for a frame that can
         // no longer be written.
         let mut out = FailingWriter::on_write(io::ErrorKind::ConnectionReset);
@@ -1305,9 +1305,9 @@ mod tests {
     #[test]
     fn self_declaring_request_is_served_without_opening_the_gate() {
         // 2026-07-28 clients open a connection per call and declare the
-        // revision in `_meta`, so this must be served, not refused. What it
-        // must not do is turn that declaration into connection state: the
-        // undeclared follow-up is how the gate proves it stayed shut.
+        // revision in _meta, so this must be served, not refused. What it must
+        // not do is turn that declaration into connection state: the undeclared
+        // follow-up is how the gate proves it stayed shut.
         let lc = lifecycle();
         assert!(matches!(
             gate(&lc, &declared("tools/list", 1)),
@@ -1332,8 +1332,8 @@ mod tests {
 
     #[test]
     fn a_handshake_revision_in_meta_does_not_skip_the_handshake() {
-        // `_meta` is not where the older revisions carry the protocol version,
-        // so naming one there buys no exemption from their `initialize`.
+        // _meta is not where the older revisions carry the protocol version, so
+        // naming one there buys no exemption from their initialize.
         let lc = lifecycle();
         let mut request = req("tools/list", Some(1));
         request.params = serde_json::json!({
@@ -1631,11 +1631,11 @@ mod tests {
 
     #[tokio::test]
     async fn a_read_resumed_mid_character_still_decodes() {
-        // `raw` outlives one call on purpose: RMCP polls `receive` inside a
-        // select! and drops the read whenever another arm wins, which can land
-        // between the bytes of one character. The decode runs once on the
-        // reassembled buffer, so the halves have to be carried as bytes rather
-        // than decoded apart and rejected as malformed.
+        // raw outlives one call on purpose: RMCP polls receive inside a select!
+        // and drops the read whenever another arm wins, which can land between
+        // the bytes of one character. The decode runs once on the reassembled
+        // buffer, so the halves have to be carried as bytes rather than decoded
+        // apart and rejected as malformed.
         let mut raw = vec![0xE4, 0xBD]; // the first two bytes of 你
         let rest = [0xA0, b'\n'];
         let mut reader = BufReader::new(&rest[..]);
@@ -1672,12 +1672,12 @@ mod tests {
 
     #[tokio::test]
     async fn a_cancelled_read_resumes_instead_of_losing_the_line() {
-        // RMCP polls `receive` inside a select!, so a read in progress is
-        // dropped whenever a response becomes ready. The bytes already taken
-        // have to survive that, or the client's request is split in two and
-        // never answered. This is the failure that hung CI: it needs an
-        // outgoing response to land mid-read, so it is timing-dependent in the
-        // server and deterministic only here.
+        // RMCP polls receive inside a select!, so a read in progress is dropped
+        // whenever a response becomes ready. The bytes already taken have to
+        // survive that, or the client's request is split in two and never
+        // answered. This is the failure that hung CI: it needs an outgoing
+        // response to land mid-read, so it is timing-dependent in the server
+        // and deterministic only here.
         let (client, mut server) = tokio::io::duplex(64);
         let mut reader = BufReader::new(client);
         let mut raw = Vec::new();

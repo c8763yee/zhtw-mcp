@@ -31,13 +31,12 @@ pub(crate) fn fix_quote_pairing(text: &str, issues: &mut [Issue]) {
         return;
     }
 
-    // Determine whether character-based open/close detection is safe.
-    // Run a trial: treat \u{201c} as open and \u{201d} as close.
-    // If depth never goes negative within each paragraph, character-based
-    // mode is reliable.  The trial must reset depth at paragraph breaks
-    // (double newline) to match the actual assignment loop below — otherwise
-    // a single missing close quote in one paragraph would force the entire
-    // document into positional fallback.
+    // Determine whether character-based open/close detection is safe. Run a
+    // trial: treat \u{201c} as open and \u{201d} as close. If depth never goes
+    // negative within each paragraph, character-based mode is reliable. The
+    // trial must reset depth at paragraph breaks (double newline) to match the
+    // actual assignment loop below: otherwise a single missing close quote in
+    // one paragraph would force the entire document into positional fallback.
     let char_based_ok = {
         let first = &issues[quote_indices[0]].found;
         let all_same = quote_indices.iter().all(|&idx| issues[idx].found == *first);
@@ -46,7 +45,9 @@ pub(crate) fn fix_quote_pairing(text: &str, issues: &mut [Issue]) {
             let mut trial_prev_end: usize = 0;
             quote_indices.iter().all(|&idx| {
                 let offset = issues[idx].offset;
-                // Reset depth at paragraph breaks, matching the assignment loop.
+
+                // Reset depth at paragraph breaks, matching the assignment
+                // loop.
                 if offset > trial_prev_end && has_paragraph_break(text, trial_prev_end, offset) {
                     d = 0;
                 }
@@ -106,13 +107,12 @@ pub(crate) fn fix_quote_pairing(text: &str, issues: &mut [Issue]) {
     }
 
     // CN single curly quotes: \u{2018}/\u{2019} → 『/』 (always secondary).
-    // Unlike double quotes which alternate depth, single quotes in CN text
-    // are already the "inner" quote level, mapping directly to TW 『/』.
-    // No depth tracking needed — fix_quote_pairing for doubles handles the
-    // primary level.
+    // Unlike double quotes which alternate depth, single quotes in CN text are
+    // already the "inner" quote level, mapping directly to TW 『/』. No depth
+    // tracking needed: fix_quote_pairing for doubles handles the primary level.
     //
-    // (suggestions are already set to 『/』 by scan_cn_curly_quotes, so
-    //  this is a no-op unless future logic needs to adjust them.)
+    // (suggestions are already set to 『/』 by scan_cn_curly_quotes, so this is
+    // a no-op unless future logic needs to adjust them.)
 }
 
 /// Stack-based quote hierarchy validator.

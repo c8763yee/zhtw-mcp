@@ -1,9 +1,9 @@
 // Per-request token telemetry for LLM cost accounting.
 //
-// Accumulates counters during scan + disambig + sampling, then derives
-// three ratio metrics plus cache/tier2 counters for the response.
-// All counters use u64 with saturating arithmetic.  Ratio metrics
-// with zero denominators emit null.
+// Accumulates counters during scan + disambig + sampling, then derives three
+// ratio metrics plus cache/tier2 counters for the response. All counters use
+// u64 with saturating arithmetic. Ratio metrics with zero denominators emit
+// null.
 
 use serde::Serialize;
 
@@ -98,11 +98,14 @@ impl TokenTelemetry {
 /// Metrics with zero denominators serialize as null (not omitted).
 #[derive(Debug, Clone, Serialize)]
 pub struct TelemetryMetrics {
-    /// Average estimated LLM token cost per 1000 input characters.  null if input is empty.
+    /// Average estimated LLM token cost per 1000 input characters. null if
+    /// input is empty.
     pub estimated_tokens_per_1k_chars: Option<f64>,
-    /// Estimated LLM token share of total per-call cost [0.0, 1.0].  null if no work done.
+    /// Estimated LLM token share of total per-call cost [0.0, 1.0]. null if no
+    /// work done.
     pub estimated_llm_token_share: Option<f64>,
-    /// Average estimated LLM tokens spent per ambiguous term.  null if no ambiguous terms.
+    /// Average estimated LLM tokens spent per ambiguous term. null if no
+    /// ambiguous terms.
     pub estimated_tokens_per_ambiguous_term: Option<f64>,
     /// Judgment cache hit count (51.4 ROI).
     pub cache_hit_count: u64,
@@ -115,7 +118,8 @@ pub struct TelemetryMetrics {
 }
 
 /// Raw counter snapshot included in telemetry output.
-/// prompt/completion tokens are estimates (bytes/3 heuristic), not actual counts.
+/// prompt/completion tokens are estimates (bytes/3 heuristic), not actual
+/// counts.
 #[derive(Debug, Clone, Serialize)]
 pub struct RawTelemetryCounters {
     pub input_chars: u64,

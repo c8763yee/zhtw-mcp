@@ -1,4 +1,4 @@
-// Integration tests for the CLI `convert` subcommand, focused on the --verify
+// Integration tests for the CLI convert subcommand, focused on the --verify
 // gate.
 //
 // Conversion is otherwise entirely local. --verify is what sends the sentences

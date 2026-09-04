@@ -51,7 +51,7 @@ pub fn init(default_level: &str) {
 
 pub fn set_mcp_log_sender(tx: Option<mpsc::Sender<McpLogMessage>>) {
     // A poisoned lock means a log-forwarding thread panicked while holding it.
-    // `McpLogLayer::on_event` already degrades to "no forwarding" in that case,
+    // McpLogLayer::on_event already degrades to "no forwarding" in that case,
     // so panicking here would take the server down over a logging side channel.
     // Recover the guard and carry on.
     let slot = MCP_LOG_TX.get_or_init(|| Mutex::new(None));
@@ -79,7 +79,7 @@ where
         // actually produced.
         //
         // The crate itself or a module inside it, not merely a target that
-        // starts with the same letters: `zhtw_mcp_helper` is a different crate
+        // starts with the same letters: zhtw_mcp_helper is a different crate
         // and its logs are no more ours than the SDK's.
         if !is_ours(event.metadata().target()) {
             return;

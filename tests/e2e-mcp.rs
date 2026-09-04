@@ -287,7 +287,7 @@ fn e2e_initialize_and_tools_list() {
         }),
     );
 
-    // 3. Tools list — 1 tool: zhtw
+    // 3. Tools list: 1 tool: zhtw
     let resp = send_recv(
         &mut stdin,
         &mut stdout,
@@ -304,7 +304,7 @@ fn e2e_initialize_and_tools_list() {
     let tool_names: Vec<&str> = tools.iter().map(|t| t["name"].as_str().unwrap()).collect();
     assert!(tool_names.contains(&"zhtw"));
 
-    // Verify tool annotations use the MCP-spec `*Hint` wire names; any other
+    // Verify tool annotations use the MCP-spec *Hint wire names; any other
     // spelling is silently dropped by spec-compliant clients.
     let zhtw = tools.iter().find(|t| t["name"] == "zhtw").unwrap();
     assert_eq!(zhtw["annotations"]["readOnlyHint"], true);
@@ -329,7 +329,7 @@ fn e2e_initialize_and_tools_list() {
         "detect_style must appear in zhtw schema"
     );
 
-    // 4. zhtw lint-only (fix_mode absent = none) — detect 軟件
+    // 4. zhtw lint-only (fix_mode absent = none): detect 軟件
     let resp = send_recv(
         &mut stdin,
         &mut stdout,
@@ -360,7 +360,7 @@ fn e2e_initialize_and_tools_list() {
     // text field returns original (no fixes)
     assert_eq!(output["text"], "這個軟件很好用");
 
-    // 5. zhtw gate-pass — clean text + max_errors: 0 + fix_mode: safe
+    // 5. zhtw gate-pass: clean text + max_errors: 0 + fix_mode: safe
     let resp = send_recv(
         &mut stdin,
         &mut stdout,
@@ -385,7 +385,7 @@ fn e2e_initialize_and_tools_list() {
     assert_eq!(output["gate"]["enabled"], true);
     assert_eq!(output["gate"]["residual_errors"], 0);
 
-    // 6. zhtw gate-fix — dirty text + fix_mode: safe, verify fixes
+    // 6. zhtw gate-fix: dirty text + fix_mode: safe, verify fixes
     let resp = send_recv(
         &mut stdin,
         &mut stdout,
@@ -411,7 +411,7 @@ fn e2e_initialize_and_tools_list() {
     assert!(fixed_text.contains("記憶體"));
     assert!(output["applied_fixes"].as_u64().unwrap() > 0);
 
-    // 7. zhtw with ignore_terms — 軟件 downgraded to info
+    // 7. zhtw with ignore_terms: 軟件 downgraded to info
     let resp = send_recv(
         &mut stdin,
         &mut stdout,
@@ -455,7 +455,7 @@ fn e2e_initialize_and_tools_list() {
     assert_eq!(resources[0]["uri"], "zh-tw://style-guide/moe");
     assert_eq!(resources[1]["uri"], "zh-tw://dictionary/ambiguous");
 
-    // 9. resources/read — style guide
+    // 9. resources/read: style guide
     let resp = send_recv(
         &mut stdin,
         &mut stdout,
@@ -749,7 +749,7 @@ fn e2e_initialize_and_tools_list() {
         "accepted should include 'plain'"
     );
 
-    // -- E2E: output: "compact" — deduplicated issues, no text/trace fields --
+    // -- E2E: output: "compact", deduplicated issues, no text/trace fields --
 
     let resp = send_recv(
         &mut stdin,
@@ -803,8 +803,8 @@ fn e2e_initialize_and_tools_list() {
         "rule_type should use snake_case name"
     );
 
-    // -- E2E: output: "compact" with fix_mode — text included when fixes
-    // applied --
+    // -- E2E: output: "compact" with fix_mode, text included when fixes applied
+    // --
 
     let resp = send_recv(
         &mut stdin,
@@ -982,7 +982,7 @@ fn e2e_initialize_rejects_unsupported_version_with_32022() {
     assert!(supported.contains(&json!("2024-11-05")), "{resp}");
 
     // Only the handshake-reachable revisions: 2026-07-28 is served, but not
-    // from `initialize`, so offering it here would be a dead end.
+    // from initialize, so offering it here would be a dead end.
     assert!(!supported.contains(&json!("2026-07-28")), "{resp}");
 
     drop(stdin);
@@ -991,11 +991,11 @@ fn e2e_initialize_rejects_unsupported_version_with_32022() {
 
 #[test]
 fn e2e_discover_mid_session_keeps_the_client_it_was_told_about() {
-    // `server/discover` may arrive after a handshake that already named the
-    // client, and its `_meta` need not carry client info. Recording that
-    // absence as the client's identity loses the name, and with it the compact
-    // output an AI-agent client gets: the answer silently grows a `text` and a
-    // `trace` field it had been told to leave out.
+    // server/discover may arrive after a handshake that already named the
+    // client, and its _meta need not carry client info. Recording that absence
+    // as the client's identity loses the name, and with it the compact output
+    // an AI-agent client gets: the answer silently grows a text and a trace
+    // field it had been told to leave out.
     let (_tmp, mut child, mut stdin, mut stdout) = spawn_server();
     let init = send_recv(
         &mut stdin,
@@ -1062,15 +1062,15 @@ fn e2e_discover_mid_session_keeps_the_client_it_was_told_about() {
 
 #[test]
 fn e2e_a_first_message_call_is_served_and_knows_its_client() {
-    // 2026-07-28 deleted `initialize`, so a client is free to open a connection
+    // 2026-07-28 deleted initialize, so a client is free to open a connection
     // and send a call on it with no handshake at all: the declaration rides in
-    // every request's `_meta`. Claude Code does exactly that, running the
+    // every request's _meta. Claude Code does exactly that, running the
     // discovery probe in one process and the calls that follow in another, so
     // this is the shape the server actually meets in production and the one
     // every other test here was missing. Two things have to hold on it. The
     // call has to be answered rather than refused as pre-init, and the client
-    // named in `_meta` has to reach the pipeline: read only at the handshake,
-    // the name never arrives on this path and an agent client silently gets the
+    // named in _meta has to reach the pipeline: read only at the handshake, the
+    // name never arrives on this path and an agent client silently gets the
     // full answer where it had been getting the compact one.
     let (_tmp, mut child, mut stdin, mut stdout) = spawn_server();
     let (_notifications, call) = send_recv_skip_notifications(
@@ -1116,9 +1116,9 @@ fn e2e_a_first_message_call_is_served_and_knows_its_client() {
 #[test]
 fn e2e_a_first_message_call_from_a_handshake_revision_is_refused() {
     // The exemption is the property of a revision that has no handshake, not of
-    // anything that puts a version in `_meta`. A client naming an older
-    // revision there is not a client of that revision, and still owes the
-    // `initialize` its own revision defines.
+    // anything that puts a version in _meta. A client naming an older revision
+    // there is not a client of that revision, and still owes the initialize its
+    // own revision defines.
     let (_tmp, mut child, mut stdin, mut stdout) = spawn_server();
     let call = send_recv(
         &mut stdin,
@@ -1147,10 +1147,10 @@ fn e2e_a_first_message_call_from_a_handshake_revision_is_refused() {
 fn e2e_every_termination_path_reports_the_code_it_promises() {
     // The exit contract in one place, because its cells have been wrong
     // separately: a reply queued and then abandoned, a drain that never
-    // returned, a code that did not match. `shutdown` before `exit` means a
-    // clean 0 and an answered shutdown; `exit` alone means 1; end of input
-    // means 0. Each holds before the handshake and after it, and those are
-    // different code paths: the framing layer answers one, the SDK the other.
+    // returned, a code that did not match. shutdown before exit means a clean 0
+    // and an answered shutdown; exit alone means 1; end of input means 0. Each
+    // holds before the handshake and after it, and those are different code
+    // paths: the framing layer answers one, the SDK the other.
     struct Case {
         what: &'static str,
         handshake_first: bool,
@@ -1227,7 +1227,7 @@ fn e2e_every_termination_path_reports_the_code_it_promises() {
         while stdout.read_line(&mut line).unwrap_or(0) > 0 {
             if let Ok(msg) = serde_json::from_str::<Value>(line.trim()) {
                 if msg["id"] == 99 {
-                    // Shape as well as presence: the answer to `shutdown` is an
+                    // Shape as well as presence: the answer to shutdown is an
                     // empty result, not merely something bearing its id.
                     assert_eq!(msg["result"], json!({}), "{}: shutdown reply", case.what);
                     acknowledged = true;
@@ -1358,7 +1358,7 @@ fn e2e_cancelling_a_call_stops_it_waiting_on_sampling() {
 
 #[test]
 fn e2e_framing_replies_survive_concurrent_responses() {
-    // The framing layer's own replies are produced inside `receive`, which RMCP
+    // The framing layer's own replies are produced inside receive, which RMCP
     // polls in a select! and drops whenever another arm wins. Writing from in
     // there loses the reply and the line that caused it is already consumed, so
     // the client waits on an answer that was never written. It only shows up
@@ -1411,7 +1411,7 @@ fn e2e_framing_replies_survive_concurrent_responses() {
 #[test]
 fn e2e_initialize_after_discover_answers_the_version_asked_for() {
     // RMCP patches the negotiated version onto the result only when the session
-    // began with the handshake. Opening with `server/discover` first takes the
+    // began with the handshake. Opening with server/discover first takes the
     // other path, where the reply used to name the server default rather than
     // the version requested.
     let (_tmp, mut child, mut stdin, mut stdout) = spawn_server();
@@ -1457,7 +1457,7 @@ fn e2e_initialize_after_discover_answers_the_version_asked_for() {
 
 #[test]
 fn e2e_bad_params_on_a_known_method_is_not_method_not_found() {
-    // `ClientRequest` is untagged with `CustomRequest` last, so a known method
+    // ClientRequest is untagged with CustomRequest last, so a known method
     // whose params are the wrong shape falls through to the custom handler.
     // Answering METHOD_NOT_FOUND there tells a client its tool does not exist.
     let (mut stdin, mut stdout, mut child, _tmp) = spawn_initialized_child();
@@ -1559,25 +1559,25 @@ fn e2e_sampling_reply_reaches_the_server() {
 
 #[test]
 fn e2e_a_judgment_survives_a_process_that_is_killed() {
-    // The judgment cache used to be written only by the exit flush and by
-    // `Drop`, and a stateless client runs neither: it opens a process per call
-    // and ends it with a signal. Every judgment a session paid the client to
-    // make was thrown away on the teardown path the clients actually use, so
-    // the next call asked the same question again. The write now happens at the
-    // end of the call that earned it, which is the last moment the process is
+    // The judgment cache used to be written only by the exit flush and by Drop,
+    // and a stateless client runs neither: it opens a process per call and ends
+    // it with a signal. Every judgment a session paid the client to make was
+    // thrown away on the teardown path the clients actually use, so the next
+    // call asked the same question again. The write now happens at the end of
+    // the call that earned it, which is the last moment the process is
     // guaranteed to still be alive.
     let (tmp, mut child, mut stdin, mut stdout) = spawn_server();
     start_sampling_call(&mut stdin, &mut stdout);
     let (answered, _) = answer_sampling_until(&mut stdin, &mut stdout, 2);
     assert!(answered > 0, "the server never asked the client to sample");
 
-    // No `exit`, no end of input: the process is taken out from under itself,
-    // which is what a signal does to `Drop` and to the exit flush both.
+    // No exit, no end of input: the process is taken out from under itself,
+    // which is what a signal does to Drop and to the exit flush both.
     child.kill().expect("kill the server");
     let _ = child.wait();
 
-    // `spawn_server` sets XDG_CONFIG_HOME, and `rules::store::config_dir`
-    // honors it on every platform, so the cache has exactly one place to be.
+    // spawn_server sets XDG_CONFIG_HOME, and rules::store::config_dir honors it
+    // on every platform, so the cache has exactly one place to be.
     let cache = tmp.path().join(".config/zhtw-mcp/judgment_cache.json");
     assert!(
         cache.exists(),
@@ -1590,7 +1590,7 @@ fn e2e_a_judgment_survives_a_process_that_is_killed() {
 #[test]
 fn e2e_modern_logging_opt_in_is_delivered_not_wedged() {
     // Log delivery on this path used to go through the RMCP peer, which on a
-    // connection that never saw an `initialize` accepts the notification and
+    // connection that never saw an initialize accepts the notification and
     // never resolves the future that says it reached the wire. The request
     // parked forever: no reply, no exit, both threads idle. It needs an actual
     // log to deliver, which is why the server runs at info here; at the default
@@ -1603,7 +1603,7 @@ fn e2e_modern_logging_opt_in_is_delivered_not_wedged() {
     // below reports as a failure like any other.
     //
     // Disarmed by dropping the sender once the reply is in. Left to fire
-    // unconditionally, the kill outlives `child.wait()` and lands on whatever
+    // unconditionally, the kill outlives child.wait() and lands on whatever
     // process inherited the pid by then, which in this binary is a server
     // another test is still talking to.
     let pid = child.id();
@@ -1690,12 +1690,11 @@ fn e2e_discovery_answers_a_revision_it_does_not_serve() {
 
 #[test]
 fn e2e_a_declared_client_does_not_outlive_its_request() {
-    // The identity rides in `_meta` on this revision, which makes it scoped to
+    // The identity rides in _meta on this revision, which makes it scoped to
     // the request that carried it, exactly like the logging opt-in beside it.
     // Recorded on the connection instead, one call naming an agent client moved
     // the default output mode for every later call that named nobody, and the
-    // answer silently lost the `text` and `trace` fields it was supposed to
-    // carry.
+    // answer silently lost the text and trace fields it was supposed to carry.
     let (_tmp, mut child, mut stdin, mut stdout) = spawn_server();
 
     let declared = send_recv(
@@ -1727,9 +1726,9 @@ fn e2e_a_declared_client_does_not_outlive_its_request() {
         "the request named claude-code, so its own answer is compact: {body}"
     );
 
-    // The same must hold through `server/discover`, which is the other request
-    // whose `_meta` can name a client. A probe is not consent for a later
-    // request that named nobody to be answered as whoever probed.
+    // The same must hold through server/discover, which is the other request
+    // whose _meta can name a client. A probe is not consent for a later request
+    // that named nobody to be answered as whoever probed.
     let discover = send_recv(
         &mut stdin,
         &mut stdout,
@@ -1783,11 +1782,11 @@ fn e2e_a_declared_client_does_not_outlive_its_request() {
 
 #[test]
 fn e2e_modern_logging_opt_in_does_not_leak() {
-    // The `logging` key in client capabilities is this server's own extension,
-    // and it was read only off `initialize` params. A 2026-07-28 client never
-    // sends `initialize`, so the opt-in had nowhere to arrive and the whole
+    // The logging key in client capabilities is this server's own extension,
+    // and it was read only off initialize params. A 2026-07-28 client never
+    // sends initialize, so the opt-in had nowhere to arrive and the whole
     // channel was unreachable on the path those clients take. It is read from
-    // the same `_meta` that carries everything else that revision declares.
+    // the same _meta that carries everything else that revision declares.
     //
     // At the default filter this server logs nothing above warn, so neither
     // request produced a line and the second could not have received one
@@ -1851,7 +1850,7 @@ fn e2e_modern_logging_opt_in_does_not_leak() {
 
 #[test]
 fn e2e_resource_templates_list_is_empty_not_missing() {
-    // `resources/templates/list` is a standard request under the `resources`
+    // resources/templates/list is a standard request under the resources
     // capability this server advertises, and one of the ten 2026-07-28 defines.
     // Having no templates is not the same as not implementing the method, so
     // the answer is an empty list rather than METHOD_NOT_FOUND.
@@ -2725,8 +2724,8 @@ fn e2e_response_shaped_with_id_discarded() {
     writeln!(stdin, "{response_msg}").unwrap();
     stdin.flush().unwrap();
 
-    // No error response expected — verify the server is still alive by sending
-    // a real request and getting a valid response.
+    // No error response expected: verify the server is still alive by sending a
+    // real request and getting a valid response.
     let resp = send_recv(
         &mut stdin,
         &mut stdout,
@@ -2908,7 +2907,7 @@ fn e2e_auto_compact_for_ai_clients() {
         }),
     );
 
-    // Call zhtw WITHOUT explicit "output" field — should auto-compact.
+    // Call zhtw WITHOUT explicit "output" field: should auto-compact.
     let resp = send_recv(
         &mut stdin,
         &mut stdout,
@@ -3063,7 +3062,7 @@ fn e2e_explain_mode_and_determinism() {
     assert!(!issues.is_empty());
 
     // Verify explain mode actually produces the explanation annotation
-    // (distinct from the `context` field which exists regardless of explain
+    // (distinct from the context field which exists regardless of explain
     // mode).
     let has_explanation = issues.iter().any(|i| i.get("explanation").is_some());
     assert!(
@@ -3071,7 +3070,7 @@ fn e2e_explain_mode_and_determinism() {
         "explain mode should produce 'explanation' field on at least one issue"
     );
 
-    // Lint same text twice — results should be identical (deterministic).
+    // Lint same text twice: results should be identical (deterministic).
     let resp2 = send_recv(
         &mut stdin,
         &mut stdout,
@@ -3152,7 +3151,7 @@ fn e2e_reject_unknown_params() {
 fn e2e_all_known_params_accepted() {
     let (mut stdin, mut stdout, mut child, _tmp) = spawn_initialized_child();
 
-    // Send tools/call with only known parameters — should succeed (no error).
+    // Send tools/call with only known parameters: should succeed (no error).
     let resp = send_recv(
         &mut stdin,
         &mut stdout,

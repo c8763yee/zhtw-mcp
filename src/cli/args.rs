@@ -1,11 +1,10 @@
-// Command-line parsing: argv in, a typed `Cli` out.
+// Command-line parsing: argv in, a typed Cli out.
 //
-// Parsing is a pure function over argv (`parse_args`) and execution is a
-// separate dispatch (`run` in main.rs). They were one 845-line `main` that
-// mixed the two, which meant every flag combination could only be tested by
-// spawning the binary. Keep them separate: nothing here may touch the
-// filesystem, the environment, or the network, so the flag matrix stays
-// unit-testable.
+// Parsing is a pure function over argv (parse_args) and execution is a separate
+// dispatch (run in main.rs). They were one 845-line main that mixed the two,
+// which meant every flag combination could only be tested by spawning the
+// binary. Keep them separate: nothing here may touch the filesystem, the
+// environment, or the network, so the flag matrix stays unit-testable.
 
 use anyhow::{Context, Result};
 use std::path::PathBuf;
@@ -135,10 +134,10 @@ fn path_value(value: Option<&String>, missing: &'static str) -> Result<PathBuf> 
 fn validated_content_type(value: Option<&String>) -> Result<String> {
     let ct = value.context("--content-type requires a value")?;
     match ct.as_str() {
-        // `convert` accepted these two abbreviations before the validator was
-        // shared, and `run_convert` still has arms for them. Normalize instead
-        // of rejecting, so sharing the validator does not quietly drop an
-        // argument that used to work, and so `lint` gains them too.
+        // convert accepted these two abbreviations before the validator was
+        // shared, and run_convert still has arms for them. Normalize instead of
+        // rejecting, so sharing the validator does not quietly drop an argument
+        // that used to work, and so lint gains them too.
         "md" => Ok("markdown".to_owned()),
         "yml" => Ok("yaml".to_owned()),
         "plain" | "markdown" | "markdown-scan-code" | "yaml" => Ok(ct.clone()),
@@ -179,19 +178,19 @@ fn claim(current: &Command, name: &str) -> Result<()> {
 /// of those are resolved in `run`.
 pub(crate) fn parse_args(args: &[String]) -> Result<Cli> {
     // Usage:
-    //   zhtw-mcp                                — run MCP server (default paths)
-    //   zhtw-mcp --overrides <path>             — custom overrides JSON path
-    //   zhtw-mcp --suppressions <path>          — custom suppressions JSON path
-    //   zhtw-mcp --pack <name>                  — activate a rule pack (repeatable)
-    //   zhtw-mcp lint <file|--> [--format json|compact]  — lint file(s) or stdin
+    //   zhtw-mcp                                  run MCP server (default paths)
+    //   zhtw-mcp --overrides <path>               custom overrides JSON path
+    //   zhtw-mcp --suppressions <path>            custom suppressions JSON path
+    //   zhtw-mcp --pack <name>                    activate a rule pack (repeatable)
+    //   zhtw-mcp lint <file|--> [--format json|compact]    lint file(s) or stdin
     //                           [--max-errors N]
     //                           [--profile P] [--detect-ai]
     //                           [--content-type plain|markdown|yaml]
-    //   zhtw-mcp setup <host>                   — generate agentic editor integration config
-    //   zhtw-mcp pack import <file>             — install a pack
-    //   zhtw-mcp pack export <name>             — export a pack
-    //   zhtw-mcp pack validate <file>           — validate a pack file
-    //   zhtw-mcp pack list                      — list available packs
+    //   zhtw-mcp setup <host>                     generate agentic editor integration config
+    //   zhtw-mcp pack import <file>               install a pack
+    //   zhtw-mcp pack export <name>               export a pack
+    //   zhtw-mcp pack validate <file>             validate a pack file
+    //   zhtw-mcp pack list                        list available packs
     let mut cli = Cli {
         overrides_path: None,
         suppressions_path: None,
@@ -420,7 +419,7 @@ fn parse_lint(rest: &[String]) -> Result<(LintArgs, usize)> {
             }
             "--detect-style" => {
                 // Combined shorthand: enable both AI filler and translationese
-                // detection. Scores remain orthogonal — reported side by side,
+                // detection. Scores remain orthogonal: reported side by side,
                 // never merged.
                 lint.detect_ai = true;
                 lint.detect_translationese = true;
@@ -900,7 +899,7 @@ mod tests {
     #[test]
     fn lint_treats_unknown_flags_as_file_paths() {
         // Documented behavior: global flags belong before the subcommand, so
-        // anything unrecognized after `lint` is a path, not an error.
+        // anything unrecognized after lint is a path, not an error.
         let lint = lint_of(&["lint", "--pack", "medical"]);
         assert_eq!(lint.files, ["--pack", "medical"]);
     }

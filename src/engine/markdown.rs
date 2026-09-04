@@ -28,7 +28,7 @@ pub struct MdScanOptions {
     /// When true, the byte ranges of pulldown-cmark `Tag::BlockQuote`
     /// events are excluded.  Implemented via cmark events so that nested
     /// blockquotes (`> >`), lazy continuation lines, and blockquotes
-    /// inside list items behave correctly.  Off by default — adopted
+    /// inside list items behave correctly.  Off by default: adopted
     /// blockquote prose is real content.
     pub exempt_blockquotes: bool,
 }
@@ -224,11 +224,11 @@ pub fn build_yaml_excluded_ranges(text: &str) -> Vec<ByteRange> {
 /// Per the YAML spec, a block-mapping key separator is a : followed by a
 /// space, tab, or end-of-line.  This handles all common block-mapping forms:
 ///
-/// - key: value           — simple key
-/// - key-name: value      — hyphenated key
-/// -   indented: value    — indented key
-/// - - key: value         — key inside a list item
-/// - "quoted-key": value  — quoted key (quote skipped; no escape handling)
+/// - key: value          , simple key
+/// - key-name: value     , hyphenated key
+/// -   indented: value   , indented key
+/// - - key: value        , key inside a list item
+/// - "quoted-key": value , quoted key (quote skipped; no escape handling)
 ///
 /// Known limitations (acceptable for prose documentation YAML):
 /// - Flow mappings without whitespace after : (e.g. {key:"val"}) are not
@@ -360,7 +360,7 @@ pub fn extract_heading_ranges(text: &str) -> Vec<ByteRange> {
             Event::End(TagEnd::Heading(_)) if in_heading => {
                 if let (Some(start), Some(end)) = (current_inline_start, current_inline_end) {
                     // Skip false-positive headings synthesised from frontmatter
-                    // content + closing `---`.
+                    // content + closing "---".
                     if start >= frontmatter_end {
                         ranges.push(ByteRange { start, end });
                     }
@@ -406,9 +406,9 @@ fn collect_frontmatter_structural_ranges(text: &str, fm_end: usize, ranges: &mut
             });
         }
 
-        // Preserve ASCII `"` and `'` bytes used as YAML scalar delimiters by
+        // Preserve ASCII '"' and "'" bytes used as YAML scalar delimiters by
         // excluding them from the punctuation scanner. Without this, the
-        // scanner converts `"` to `「`/`」` inside frontmatter values and
+        // scanner converts '"' to "「"/"」" inside frontmatter values and
         // breaks downstream YAML parsers (regression observed in ai-muninn.com
         // calque blindspot sweep, 2026-05).
         for (i, b) in raw_line.bytes().enumerate() {
@@ -580,7 +580,7 @@ mod tests {
         // Key+colon is excluded.
         let any_covers_title_key = ranges.iter().any(|r| md[r.start..r.end].contains("title:"));
         assert!(any_covers_title_key, "title: key should be excluded");
-        // Value text is NOT excluded — it's prose to be scanned.
+        // Value text is NOT excluded: it's prose to be scanned.
         let value_excluded = ranges.iter().any(|r| md[r.start..r.end].contains("測試"));
         assert!(
             !value_excluded,
@@ -599,7 +599,7 @@ mod tests {
     #[test]
     fn extract_heading_ranges_skips_frontmatter_setext() {
         // pulldown-cmark synthesises a setext H2 from frontmatter content +
-        // closing `---`. We must skip that false-positive heading so the
+        // closing "---". We must skip that false-positive heading so the
         // severity boost does not apply to frontmatter values.
         let md = "---\ntitle: 軟件測試指南\ndate: 2026\n---\n# 真標題\n正文。\n";
         let ranges = extract_heading_ranges(md);
@@ -776,7 +776,7 @@ mod tests {
 
     #[test]
     fn yaml_list_mapping_key_excluded() {
-        // - key: value — the key colon inside a list item must be excluded.
+        // - key: value, the key colon inside a list item must be excluded.
         let yaml = "- name: 測試\n- label: 標籤\n";
         let ranges = build_yaml_excluded_ranges(yaml);
 

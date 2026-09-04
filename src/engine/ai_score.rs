@@ -1,11 +1,11 @@
 // Document-level AI signature scoring.
 //
 // Aggregates per-occurrence issues, density data, and structural pattern counts
-// into a single composite score.  Deterministic, no ML.
+// into a single composite score. Deterministic, no ML.
 //
 // The score is a weighted sum of normalized density ratios and structural
-// indicators.  Each signal contributes proportionally to how far it exceeds
-// its human baseline threshold.
+// indicators. Each signal contributes proportionally to how far it exceeds its
+// human baseline threshold.
 
 use serde::{Deserialize, Serialize};
 
@@ -13,8 +13,8 @@ use crate::engine::excluded::{is_excluded, ByteRange};
 use crate::engine::scan::is_cjk_ideograph;
 use crate::rules::ruleset::{Issue, IssueType, StructuralFamily};
 
-// Density thresholds: (phrase, human_baseline, threshold, weight).
-// Weight controls contribution to the composite score.
+// Density thresholds: (phrase, human_baseline, threshold, weight). Weight
+// controls contribution to the composite score.
 const DENSITY_SIGNALS: &[(&str, f32, f32, f32)] = &[
     ("更重要的是", 0.3, 0.5, 1.0),
     ("值得注意的是", 0.2, 0.3, 1.0),
@@ -78,10 +78,10 @@ const SENTENCE_TERMINATORS: &[char] = &['。', '！', '？', '!', '?'];
 /// tokenizer artifact it is.
 fn is_emoji_base(ch: char) -> bool {
     // Sub-blocks rather than the whole plane. 1F100 to 1F1E5 is enclosed
-    // alphanumerics, 1F700 to 1F8FF is alchemical and geometric extensions,
-    // and 1FA00 to 1FA6F is chess: none of them appear in emoji joiner
-    // sequences, so accepting them would read a stray joiner between two such
-    // symbols as a valid glyph.
+    // alphanumerics, 1F700 to 1F8FF is alchemical and geometric extensions, and
+    // 1FA00 to 1FA6F is chess: none of them appear in emoji joiner sequences,
+    // so accepting them would read a stray joiner between two such symbols as a
+    // valid glyph.
     matches!(ch as u32,
         0x1F000..=0x1F0FF          // mahjong and playing cards
             | 0x1F1E6..=0x1F1FF    // regional indicators
@@ -129,6 +129,7 @@ fn joining_script(ch: char) -> Option<JoiningScript> {
         0x0600..=0x06FF | 0x0750..=0x077F | 0x08A0..=0x08FF | 0xFB50..=0xFDFF | 0xFE70..=0xFEFE => {
             Some(JoiningScript::Arabic)
         }
+
         // One variant per 128-point block, so Devanagari and Bengali are not
         // treated as the same script by a joiner that must not cross scripts.
         cp @ 0x0900..=0x0DFF => Some(JoiningScript::Indic((cp - 0x0900) / 0x80)),
@@ -273,6 +274,7 @@ const MAX_FLAG_TAG_SPEC: usize = {
 /// unterminated run, which is exactly the shape hidden instructions take.
 fn inside_flag_tag_sequence(chars: &[char], index: usize) -> bool {
     let is_spec = |c: char| ('\u{E0020}'..='\u{E007E}').contains(&c);
+
     // Find the base first, then judge the whole sequence from there. Testing
     // the payload from "index" forward instead would excuse the tail of an
     // over-long run, because from far enough in, what remains fits the bound.
@@ -323,12 +325,14 @@ pub fn is_suspicious_zero_width_at(chars: &[char], index: usize) -> bool {
     let next = chars.get(index + 1).copied();
     match ch {
         '\u{200B}' => true,
+
         // ZWNJ is orthography in Persian, Urdu and the Indic scripts, by the
         // same argument that exempts LRM/RLM below. Elsewhere it is residue.
         '\u{200C}' => !zwnj_is_orthographic(prev, next),
         '\u{FEFF}' => index != 0, // A file-start BOM is an encoding marker.
         '\u{200D}' => {
             let indic = indic_conjunct(prev, next);
+
             // A modifier belongs directly on a base, so it is never what a
             // joiner introduces, though it may be what precedes one.
             let emoji = !next.is_some_and(is_emoji_modifier)
@@ -336,19 +340,23 @@ pub fn is_suspicious_zero_width_at(chars: &[char], index: usize) -> bool {
                 && next.is_some_and(is_emoji_base);
             !(indic || emoji)
         }
-        // LRM/RLM are required for some mixed-direction text. Do not turn
-        // their mere presence into an AI signal or a rewrite instruction.
+
+        // LRM/RLM are required for some mixed-direction text. Do not turn their
+        // mere presence into an AI signal or a rewrite instruction.
         '\u{200E}' | '\u{200F}' => false,
+
         // A tag character is orthographic only inside a flag sequence. Loose
         // ones are the payload of the hidden-instruction trick.
         '\u{E0020}'..='\u{E007F}' => !inside_flag_tag_sequence(chars, index),
-        // The supplement encodes ideographic variants, so it is orthographic
-        // on a CJK base and residue anywhere else. The shared predicate also
+
+        // The supplement encodes ideographic variants, so it is orthographic on
+        // a CJK base and residue anywhere else. The shared predicate also
         // admits bopomofo, which is not a valid variation base, so a selector
         // after one is excused. One predicate for "is this Han" beats a second
         // spelling of it that disagrees, and the miss needs a bopomofo letter
         // and a stray selector in the same document.
         '\u{E0100}'..='\u{E01EF}' => !prev.is_some_and(is_cjk_ideograph),
+
         // Soft hyphen, CGJ, word joiner, invisible operators, bidi overrides,
         // interlinear annotation and noncharacters have no role in zh-TW prose.
         _ => is_zero_width_candidate(ch),
@@ -410,9 +418,9 @@ fn compute_punctuation_profile(
     text_k: f32,
     excluded: &[ByteRange],
 ) -> PunctuationProfile {
-    // Collect positions using a visible-char index that only advances
-    // outside exclusion zones, so excluded content (code blocks, URLs)
-    // does not inflate inter-punctuation distances.
+    // Collect positions using a visible-char index that only advances outside
+    // exclusion zones, so excluded content (code blocks, URLs) does not inflate
+    // inter-punctuation distances.
     let mut positions: [Vec<usize>; 4] = [vec![], vec![], vec![], vec![]];
     let mut dash_positions: Vec<usize> = Vec::new();
 
@@ -502,7 +510,8 @@ fn compute_sentence_variability(text: &str, excluded: &[ByteRange]) -> Option<f3
     Some(variance.sqrt() as f32)
 }
 
-/// Count zero-width tokenizer artifact codepoints in text (excluding exclusion zones).
+/// Count zero-width tokenizer artifact codepoints in text (excluding exclusion
+/// zones).
 fn count_zero_width(text: &str, excluded: &[ByteRange]) -> usize {
     if !has_zero_width(text) {
         return 0;
@@ -543,7 +552,8 @@ pub fn compute_ai_score(
     mentions: &[ByteRange],
     threshold_multiplier: f32,
 ) -> Option<AiSignatureReport> {
-    // Guard against zero/negative multiplier to prevent div-by-zero in thresholds.
+    // Guard against zero/negative multiplier to prevent div-by-zero in
+    // thresholds.
     let threshold_multiplier = if threshold_multiplier <= 0.0 {
         1.0
     } else {
@@ -571,7 +581,7 @@ pub fn compute_ai_score(
     let mut weighted_sum: f32 = 0.0;
     let mut total_weight: f32 = 0.0;
 
-    // Signal 1: phrase density.  Apply threshold_multiplier so low/high
+    // Signal 1: phrase density. Apply threshold_multiplier so low/high
     // sensitivity affects the composite score, not just per-issue generation.
     for &(phrase, baseline, raw_threshold, weight) in DENSITY_SIGNALS {
         let threshold = raw_threshold * threshold_multiplier;
@@ -581,6 +591,7 @@ pub fn compute_ai_score(
         while let Some(pos) = text[start..].find(phrase) {
             let abs = start + pos;
             start = abs + phrase_len;
+
             // "mentions" is separate from "excluded" on purpose. A quoted
             // phrase is not being used, so it must not score; but the
             // invisible-character signal below counts through "excluded", and
@@ -616,8 +627,8 @@ pub fn compute_ai_score(
     // Occurrences were counted before, so four hits of one detector saturated
     // the signal on their own. Over 278 human zh-TW documents that pinned 53%
     // at the cap; counting families drops it to 35%. Four hits of one rule is
-    // one signal, which is what both reference skills state: an isolated
-    // device is nothing, a cluster of different devices is the confession.
+    // one signal, which is what both reference skills state: an isolated device
+    // is nothing, a cluster of different devices is the confession.
     //
     // Formatting is capped apart from prose. Bold runs, list shape and heading
     // form describe the Markdown rather than the writing, and they produced
@@ -633,13 +644,14 @@ pub fn compute_ai_score(
     let structural_contribution =
         (prose as f32 * 0.1).min(0.3) + (formatting as f32 * 0.05).min(0.15);
 
-    // Signal 3: non-structural, non-zero-width AiStyle issue density.
-    // Excludes issues already counted by signals 1 (density phrases),
-    // 2 (structural), and 5 (zero-width) to avoid double-counting.
+    // Signal 3: non-structural, non-zero-width AiStyle issue density. Excludes
+    // issues already counted by signals 1 (density phrases), 2 (structural),
+    // and 5 (zero-width) to avoid double-counting.
     let ai_issue_count = issues
         .iter()
         .filter(|i| {
             i.rule_type == IssueType::AiStyle
+
                 // Signal 2 owns anything carrying a structural family; the
                 // invisible-character layer still identifies itself by prefix.
                 && i.structural_family.is_none()
@@ -653,7 +665,9 @@ pub fn compute_ai_score(
         })
         .count();
     let ai_issue_density = ai_issue_count as f32 / text_k;
-    // High density of AI issues is itself a signal.  Threshold: >2 per 1000 chars.
+
+    // High density of AI issues is itself a signal. Threshold: >2 per 1000
+    // chars.
     let issue_density_contribution = if ai_issue_density > 2.0 {
         ((ai_issue_density - 2.0) / 5.0).min(0.3)
     } else {
@@ -666,14 +680,14 @@ pub fn compute_ai_score(
     // The threshold was 5.0 characters of standard deviation, and nothing
     // reaches it. All 158 corpus cases return None, because none has the ten
     // sentences the measurement needs, and across 405 real zh-TW documents the
-    // minimum is 13.4, including deliberately machine-written ones. A term
-    // that has never fired is not a signal, and scoring against an
-    // unfalsifiable threshold is worse than not scoring at all.
+    // minimum is 13.4, including deliberately machine-written ones. A term that
+    // has never fired is not a signal, and scoring against an unfalsifiable
+    // threshold is worse than not scoring at all.
     //
     // Kept as an observation because it is real, already serialized, and the
     // number a reader can act on. Reviving it as a signal needs a coefficient
-    // of variation rather than a raw sigma, since sigma is scale-dependent,
-    // and a long-form corpus to calibrate against. We have neither.
+    // of variation rather than a raw sigma, since sigma is scale-dependent, and
+    // a long-form corpus to calibrate against. We have neither.
     let sentence_variability = compute_sentence_variability(text, excluded);
 
     // Signal 5: zero-width tokenizer artifacts.
@@ -686,11 +700,11 @@ pub fn compute_ai_score(
         0.0
     };
 
-    // Signal 6: punctuation density matrix — aggregate CV.
+    // Signal 6: punctuation density matrix, aggregate CV.
     let punctuation_profile = compute_punctuation_profile(text, text_k, excluded);
     let punct_contribution = {
-        // Aggregate CV across types with sufficient samples (N >= 10),
-        // weighted by occurrence count.
+        // Aggregate CV across types with sufficient samples (N >= 10), weighted
+        // by occurrence count.
         let stats = [
             &punctuation_profile.comma,
             &punctuation_profile.period,
@@ -716,11 +730,10 @@ pub fn compute_ai_score(
         }
     };
 
-    // Composite score: combine all five scoring signals (rebalanced per
-    // 40.11). phrase ≤0.7, structural ≤0.45 (prose ≤0.3 plus formatting
-    // ≤0.15, capped apart), issue ≤0.3, zero-width ≤0.2, punctuation ≤0.1.
-    // Max 1.75 before clamp.
-    // No single signal exceeds 0.7; ≥0.8 requires ≥2 dimensions.
+    // Composite score: combine all five scoring signals (rebalanced per 40.11).
+    // phrase ≤0.7, structural ≤0.45 (prose ≤0.3 plus formatting ≤0.15, capped
+    // apart), issue ≤0.3, zero-width ≤0.2, punctuation ≤0.1. Max 1.75 before
+    // clamp. No single signal exceeds 0.7; ≥0.8 requires ≥2 dimensions.
     let phrase_score = if total_weight > 0.0 {
         (weighted_sum / total_weight).min(1.0) * 0.7
     } else {
@@ -847,7 +860,8 @@ mod tests {
 
     #[test]
     fn sentence_variability_uniform_low() {
-        // All sentences nearly identical length -> low sigma -> contributes to score.
+        // All sentences nearly identical length -> low sigma -> contributes to
+        // score.
         let sentence = "這是一段長度相同的句子內容";
         let mut text = String::new();
         for _ in 0..60 {
@@ -947,11 +961,11 @@ mod tests {
     }
 
     // Both walks are bounded by the longest tag payload a flag can carry, so a
-    // long run of tag characters cannot make the per-character predicate
-    // rescan the run. Unbounded, 200k of them took 59 seconds on 781 KB.
-    // A payload that is not a subdivision code is residue however well formed
-    // the sequence looks. Bounding the length alone left six characters of
-    // hidden payload behind a black flag and a terminator.
+    // long run of tag characters cannot make the per-character predicate rescan
+    // the run. Unbounded, 200k of them took 59 seconds on 781 KB. A payload
+    // that is not a subdivision code is residue however well formed the
+    // sequence looks. Bounding the length alone left six characters of hidden
+    // payload behind a black flag and a terminator.
     #[test]
     fn only_a_real_subdivision_code_spells_a_flag() {
         let tag = |s: &str| -> Vec<char> {
@@ -1152,7 +1166,7 @@ mod tests {
 
     #[test]
     fn punctuation_profile_sparse_no_cv() {
-        // Text with very few commas — CV should be None.
+        // Text with very few commas: CV should be None.
         let text = "台灣的半導體產業在全球市場中佔有重要地位。".repeat(30);
         let result = compute_ai_score(&text, &[], &[], &[], 1.0);
         let report = result.unwrap();

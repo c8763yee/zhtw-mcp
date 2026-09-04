@@ -76,35 +76,35 @@ pub struct ScanParams {
     // Currently always "None" because caching is disabled when fix_mode is
     // active. Kept for forward-compatibility.
     pub fix_mode: String,
-    // Whether AI detection is active — changes scan results.
+    // Whether AI detection is active: changes scan results.
     pub detect_ai: bool,
-    // Whether translationese detection is active — changes scan results.
+    // Whether translationese detection is active: changes scan results.
     pub detect_translationese: bool,
 
-    // Translationese domain calibration — changes thresholds and serialized
+    // Translationese domain calibration: changes thresholds and serialized
     // reports.
     #[serde(default = "default_translationese_domain")]
     pub translationese_domain: String,
 
-    // AI threshold level (formatted f32) — different multipliers produce
+    // AI threshold level (formatted f32): different multipliers produce
     // different results.
     pub ai_threshold: String,
 
-    // Markdown blockquote-exemption flag — changes which spans get scanned, so
+    // Markdown blockquote-exemption flag: changes which spans get scanned, so
     // cache hits must be invalidated when toggled.
     #[serde(default)]
     pub exempt_blockquotes: bool,
 
-    // Build identity of the scanner itself. `ruleset_hash` covers the rules but
+    // Build identity of the scanner itself. ruleset_hash covers the rules but
     // not the passes that interpret them, so without this an upgrade that
     // changes a detector keeps serving the old binary's results for every
     // unchanged file until the 24-hour TTL expires. Carries the crate version
-    // plus a hash of the scanner sources (see `emit_engine_fingerprint` in
+    // plus a hash of the scanner sources (see emit_engine_fingerprint in
     // build.rs), because a version alone only moves at a release bump and would
     // miss exactly the source-build case this is meant to cover. Entries
     // written before this field existed deserialize with an empty string and
     // therefore miss, which is the intended outcome and is pinned by
-    // `legacy_entries_without_engine_version_miss`.
+    // legacy_entries_without_engine_version_miss.
     #[serde(default)]
     pub engine_version: String,
 }
@@ -329,13 +329,13 @@ impl ScanCache {
         }
 
         // Acquire the lock BEFORE reading the file we are about to replace.
-        // `atomic_write` swaps the whole file, so serializing our own snapshot
+        // atomic_write swaps the whole file, so serializing our own snapshot
         // and writing it discards anything another process stored since we
         // loaded. That race predates this cache growing a load-time cleanup,
         // but the cleanup widened it: a run that only read the cache used to
         // leave the file alone, and now it rewrites.
         //
-        // Create the cache directory before opening the sidecar. `replace_file`
+        // Create the cache directory before opening the sidecar. replace_file
         // creates it on write, but that is too late: on a first run the
         // directory does not exist yet, opening the lock fails, and the write
         // would then proceed unlocked. Two concurrent first runs would both
@@ -385,7 +385,7 @@ impl ScanCache {
         // finer clock: a lookup revalidates the entry against the file, so a
         // stale winner misses and is rescanned. The fast path compares only
         // mtime and size and so has a same-second blind spot of its own, which
-        // `check_fast` closes by declining while the recorded mtime is that
+        // check_fast closes by declining while the recorded mtime is that
         // fresh.
         for (k, e) in on_disk {
             let ours_wins = entries
@@ -468,7 +468,7 @@ fn keys_oldest_first(entries: &HashMap<String, CacheEntry>) -> Vec<String> {
 /// before anything is removed. Returns without touching the map in the common
 /// case, where the total already fits.
 fn evict_to_byte_budget(entries: &mut HashMap<String, CacheEntry>) {
-    // A JSON array of n entries is `[` + entries + `]` with n-1 separating
+    // A JSON array of n entries is "[" + entries + "]" with n-1 separating
     // commas, not n. Counting one comma per entry overstates the total by a
     // byte, which is enough to evict an extra entry exactly at the boundary.
     let sizes: HashMap<&str, usize> = entries
@@ -480,7 +480,7 @@ fn evict_to_byte_budget(entries: &mut HashMap<String, CacheEntry>) {
         return;
     }
 
-    // Ordering comes from `keys_oldest_first`; this pass only adds the size
+    // Ordering comes from keys_oldest_first; this pass only adds the size
     // accounting on top of it.
     let mut doomed = Vec::new();
     let mut remaining = entries.len();
@@ -543,7 +543,7 @@ fn default_cache_path() -> PathBuf {
 
 /// Lookup key combining file path + scan parameters.
 /// Hashes directly into blake3 without allocating an intermediate String.
-/// One entry per (file, params) tuple — mtime/content validated on lookup.
+/// One entry per (file, params) tuple: mtime/content validated on lookup.
 fn fast_key(file_path: &str, params: &ScanParams) -> String {
     // Serialize the pair rather than listing fields. JSON is self-delimiting,
     // with quoted strings and named keys, so distinct pairs cannot produce the
@@ -1265,7 +1265,7 @@ mod tests {
 
         // Prove eviction actually ran. Without this the test passes trivially
         // whenever the fixture fails to exceed the cap, which is one edit to
-        // `OVERSIZE_FILLER` or one bump of `MAX_TOTAL_BYTES` away.
+        // OVERSIZE_FILLER or one bump of MAX_TOTAL_BYTES away.
         assert!(
             cache.entries().len() < 300,
             "nothing was evicted: the fixture never exceeded {MAX_TOTAL_BYTES} bytes"

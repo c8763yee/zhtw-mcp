@@ -15,14 +15,14 @@ use std::sync::Arc;
 
 use crate::rules::ruleset::{Issue, IssueType, Profile, Severity, Tier2Outcome};
 
-// AnchorKind — classifies calibration outcomes as hard or soft
+// AnchorKind: classifies calibration outcomes as hard or soft
 
 /// Whether a calibration anchor terminates resolution (Hard) or merely
 /// contributes evidence to Tier 2 scoring (Soft).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AnchorKind {
     /// ExactAnchor or AnchorAndContext: translation confirmed the english
-    /// anchor with high confidence.  Terminates resolution — Tier 2/3 are
+    /// anchor with high confidence.  Terminates resolution: Tier 2/3 are
     /// skipped entirely.
     Hard,
     /// SynonymAnchor or ContextOnly: weaker signal that contributes to the
@@ -48,7 +48,7 @@ pub fn classify_anchor(issue: &Issue) -> Option<AnchorKind> {
     }
 }
 
-// AmbiguityScore — the Tier 2 output
+// AmbiguityScore: the Tier 2 output
 
 /// How an issue was resolved (or left unresolved) by Tier 2.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -63,9 +63,9 @@ pub enum Resolution {
     Collocation,
     /// Combined Tier 2 evidence exceeded threshold.
     Combined,
-    /// Score is in the gray zone — needs Tier 3 LLM.
+    /// Score is in the gray zone: needs Tier 3 LLM.
     GrayZone,
-    /// Score is below ambiguous threshold — likely false positive, suppress.
+    /// Score is below ambiguous threshold: likely false positive, suppress.
     Suppressed,
 }
 
@@ -99,7 +99,7 @@ pub struct AmbiguityScore {
     pub resolution: Resolution,
 }
 
-// Collocation table — compound terms that resolve deterministically
+// Collocation table: compound terms that resolve deterministically
 
 /// A fixed collocation entry: when `trigger` appears within ±window of an
 /// ambiguous `from` term, resolve to `resolved_to`.
@@ -116,7 +116,7 @@ struct Collocation {
 /// These are compound technical terms where the surrounding word makes
 /// the meaning unambiguous.
 const COLLOCATIONS: &[Collocation] = &[
-    // 進程 vs 行程 vs 處理程序 — "process" in different domains
+    // 進程 vs 行程 vs 處理程序: "process" in different domains
     Collocation {
         from: "進程",
         trigger: "排程",
@@ -167,7 +167,7 @@ const COLLOCATIONS: &[Collocation] = &[
         trigger: "daemon",
         resolved_to: "行程",
     },
-    // 程序 — "program" vs "procedure"
+    // 程序: "program" vs "procedure"
     Collocation {
         from: "程序",
         trigger: "編譯",
@@ -370,7 +370,7 @@ const COLLOCATIONS: &[Collocation] = &[
         trigger: "超連結",
         resolved_to: "連結",
     },
-    // 令牌 — token: different TW terms per domain
+    // 令牌 is "token", with different TW terms per domain
     Collocation {
         from: "令牌",
         trigger: "OAuth",
@@ -437,7 +437,7 @@ struct PreferredTerm {
     from: &'static str,
     /// Preferred replacement for this profile.
     preferred: &'static str,
-    /// Prior weight in [0.0, 1.0] — how strongly this profile favors
+    /// Prior weight in [0.0, 1.0]: how strongly this profile favors
     /// this resolution.  0.3 = weak hint, 0.6 = strong prior.
     weight: f32,
 }
@@ -486,7 +486,7 @@ const BASE_PREFERRED: &[PreferredTerm] = &[
     },
 ];
 
-/// Strict profile has stronger priors — MoE prescriptive preference.
+/// Strict profile has stronger priors: MoE prescriptive preference.
 const STRICT_PREFERRED: &[PreferredTerm] = &[
     PreferredTerm {
         from: "進程",
@@ -585,7 +585,7 @@ impl Default for DisambigConfig {
 ///     for this ambiguous term?
 ///   - Collocation: does a fixed compound pattern resolve the term?
 ///
-/// Collocation is terminal — if matched, the score is 1.0 and the resolved
+/// Collocation is terminal: if matched, the score is 1.0 and the resolved
 /// term is set directly.
 pub fn score_issue(issue: &Issue, context_window: &str, cfg: &DisambigConfig) -> AmbiguityScore {
     // Strategy 1: hard anchor terminates immediately.
@@ -954,9 +954,9 @@ pub fn extract_semantic_chunk(text: &str, offset: usize, length: usize) -> &str 
         return chunk;
     }
 
-    // Chunk too large — narrow to ±230 chars around the offset, but respect
-    // char boundaries and try to land on a sentence boundary. The 20-char
-    // sentence boundary search margin means effective max is ~500.
+    // Chunk too large: narrow to ±230 chars around the offset, but respect char
+    // boundaries and try to land on a sentence boundary. The 20-char sentence
+    // boundary search margin means effective max is ~500.
     let half_budget = (MAX_CHUNK_CHARS - 40) / 2;
 
     // Walk backward from offset by half_budget chars.
@@ -1037,7 +1037,7 @@ fn find_chunk_start(text: &str, offset: usize) -> usize {
             return pos;
         }
 
-        // Single newline — check if the line starting at pos is a heading or
+        // Single newline: check if the line starting at pos is a heading or
         // list item.
         if bytes[pos - 1] == b'\n' && is_heading_or_list_start(text, pos) {
             return pos;
@@ -1045,7 +1045,7 @@ fn find_chunk_start(text: &str, offset: usize) -> usize {
         pos -= 1;
     }
 
-    // No boundary found within limit — use the limit position, adjusted to a
+    // No boundary found within limit: use the limit position, adjusted to a
     // char boundary.
     text.floor_char_boundary(limit)
 }
@@ -1075,7 +1075,7 @@ fn find_chunk_end(text: &str, end_offset: usize) -> usize {
         pos += 1;
     }
 
-    // No boundary found within limit — use a char-safe position.
+    // No boundary found within limit: use a char-safe position.
     text.ceil_char_boundary(limit.min(text.len()))
 }
 

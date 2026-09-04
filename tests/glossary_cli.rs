@@ -1,7 +1,7 @@
 // Project glossary integration test.
 //
-// Verifies that `[glossary] banned`, `proper_nouns`, and `preferred` fields in
-// `.zhtw-mcp.toml` are honored by the `lint` subcommand.
+// Verifies that "[glossary] banned", proper_nouns, and preferred fields in
+// .zhtw-mcp.toml are honored by the lint subcommand.
 
 use std::process::{Command, Stdio};
 
@@ -19,7 +19,7 @@ fn binary_path() -> std::path::PathBuf {
 fn glossary_banned_term_fires_even_without_context_clues() {
     let dir = tempfile::tempdir().unwrap();
 
-    // 線程 (mainland) — embedded ruleset already flags this, but we want to
+    // 線程 (mainland): embedded ruleset already flags this, but we want to
     // confirm the glossary-driven path also works. We use a banned term that
     // the embedded ruleset would NOT flag in isolation: the word "ABC" with
     // banned=["ABC"] forces flagging.

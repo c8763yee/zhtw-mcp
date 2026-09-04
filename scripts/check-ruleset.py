@@ -311,7 +311,7 @@ def wiki_zh_exists(term: str) -> tuple[bool | None, str | None]:
             if "missing" not in page:
                 return True, page.get("title")
 
-    # Tier 2: search — does the term appear anywhere in zh Wikipedia?
+    # Tier 2: search, does the term appear anywhere in zh Wikipedia?
     params = urllib.parse.urlencode(
         {
             "action": "query",
@@ -852,7 +852,7 @@ def detect_conflicts(
     }
 
     # 1. Circular: detect actual cycles (A→B→...→A) in to→from chains.
-    #    A chain A→B→C that terminates (C∉from_set) is fine — converges.
+    #    A chain A→B→C that terminates (C∉from_set) is fine: converges.
     #    Only A→B→...→A (cycle) means zh_check fix mode never converges.
     reported: set[str] = set()
     for rule in from_set.values():
@@ -888,7 +888,7 @@ def detect_conflicts(
 
     # 2. Empty to requires non-empty english (use English form convention).
     #    Exception: ai_filler rules use empty to intentionally (deletion).
-    #    2b. ai_filler rules with to:[] must NOT have english — the fallback
+    #    2b. ai_filler rules with to:[] must NOT have english, the fallback
     #        in effective_suggestions() would turn english into a suggestion,
     #        breaking the "flag-only, no suggestion" semantics.
     for rule in from_set.values():
@@ -955,12 +955,12 @@ def detect_conflicts(
         # Check if every character in 'from' is itself a single-char rule.
         decomposable_chars = [ch for ch in frm if ch in single_char_from]
         if len(decomposable_chars) >= 2 and len(decomposable_chars) == len(frm):
-            # The compound has a rule — good.  But check if its 'to' would
+            # The compound has a rule: good.  But check if its 'to' would
             # differ from naively concatenating individual replacements.
             naive = "".join(single_char_from[ch] for ch in frm)
             targets = [t for t in rule.get("to", []) if t]
             if targets and targets[0] != naive:
-                # This is fine — the compound rule overrides the naive result.
+                # This is fine: the compound rule overrides the naive result.
                 pass
             elif not targets:
                 warnings.append(
@@ -971,14 +971,14 @@ def detect_conflicts(
     # decomposed into single-char rules have correct 'to' values
     # (i.e., the compound rule isn't accidentally doing the same thing
     # as naive concatenation when it shouldn't, or vice versa).
-    # We intentionally do NOT enumerate all possible 2-char pairs — that
+    # We intentionally do NOT enumerate all possible 2-char pairs: that
     # produces a noisy cartesian product.  Instead we rely on the compound
     # decomposition check above for existing rules and on manual review
     # for new compound terms.
 
     # 6. Suggestion-is-from: a rule's to[] value is another active rule's
     #    from key.  This means applying fix mode once leaves a term that
-    #    will be re-flagged on the next scan — the fix doesn't converge in
+    #    will be re-flagged on the next scan: the fix doesn't converge in
     #    one pass.  Chains that terminate (A→B, B→C, C∉from) are fine
     #    (caught by circular check above).  Flag single-hop re-flagging.
     for rule in from_set.values():
@@ -987,7 +987,7 @@ def detect_conflicts(
                 continue
             if target in from_set and target != rule["from"]:
                 target_rule = from_set[target]
-                # Skip if the target rule fires only conditionally — either
+                # Skip if the target rule fires only conditionally: either
                 # positive context_clues (which must be present for it to
                 # fire) or negative_context_clues (which suppress it in the
                 # matching context).  In both cases the re-flag is not
@@ -1200,9 +1200,9 @@ def detect_conflicts(
     #
     #    Whole-phrase translations where the zh-TW term is structurally
     #    different (e.g. 航天飛機→太空梭, 調製解調器→數據機) are NOT
-    #    flagged — the compound replacement is a distinct lexical item.
+    #    flagged: the compound replacement is a distinct lexical item.
     #    We detect this by checking if the compound's to[] starts with
-    #    the base rule's to[] — if not, it's a whole-phrase replacement.
+    #    the base rule's to[]: if not, it's a whole-phrase replacement.
     for rule in from_set.values():
         frm = rule["from"]
         targets = [t for t in rule.get("to", []) if t]
@@ -1221,7 +1221,7 @@ def detect_conflicts(
             compound_result = targets[0]
             base_to = base_targets[0]
             # Only flag if the compound's replacement shares the same
-            # prefix as the base rule's replacement — this means the
+            # prefix as the base rule's replacement: this means the
             # compound is doing a prefix swap and dropping the suffix.
             # Whole-phrase replacements (different prefix) are intentional.
             if not compound_result.startswith(base_to):
@@ -1236,7 +1236,7 @@ def detect_conflicts(
             # (e.g. SQL隱碼攻擊 already contains 攻擊; 公車 contains 車).
             if compound_result == base_to and not base_to.endswith(suffix):
                 # Skip when the base rule already lists the compound's
-                # from term as an exception — the scanner will never apply
+                # from term as an exception: the scanner will never apply
                 # the base rule to that compound, so no conflict in practice.
                 base_exceptions = base_rule.get("exceptions", [])
                 if frm in base_exceptions:
@@ -1288,7 +1288,7 @@ def detect_conflicts(
                 )
         # Self-suppression: negative clue equals the from term exactly.
         # Compound negative clues that merely contain from as substring
-        # (e.g. from="搜索", neg="搜索令") are intentional — they suppress
+        # (e.g. from="搜索", neg="搜索令") are intentional: they suppress
         # the rule when the compound word appears in context.
         for clue in rule.get("negative_context_clues") or []:
             if isinstance(clue, str) and clue == frm:
@@ -1418,7 +1418,7 @@ def detect_conflicts(
         # (OpenCC variant pairs like 裡/里).  If so, it is intentional.
         # NOTE: this is a Hamming-distance heuristic, not true OpenCC
         # normalization.  It tolerates ≤2 char diffs at equal length.
-        # For geographic names this is sufficient — two unrelated countries
+        # For geographic names this is sufficient: two unrelated countries
         # with same-length names differing by ≤2 chars is not realistic.
         is_variant_pair = True
         for i in range(len(froms)):
@@ -1440,7 +1440,7 @@ def detect_conflicts(
             )
 
     # 12. Redundant domain constraint: @domain X + 限X語境 in the same
-    #     context is redundant — the @domain tag already declares the domain.
+    #     context is redundant: the @domain tag already declares the domain.
     for rule in from_set.values():
         frm = rule["from"]
         ctx = rule.get("context", "")
@@ -1564,7 +1564,7 @@ def detect_conflicts(
 
     # 15. Missing english field on cross_strait / confusable / typo rules.
     #     variant (single-char 異體字), ai_filler, and political_coloring
-    #     rules are exempt — they either have no English equivalent or serve
+    #     rules are exempt: they either have no English equivalent or serve
     #     a non-translation purpose.
     for rule in from_set.values():
         rtype = rule.get("type", "")

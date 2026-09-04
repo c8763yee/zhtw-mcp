@@ -20,7 +20,7 @@
 // "zhtw:disable-block" to fence off a region.
 //
 // Markers are recognized lexically, with no knowledge of string literals. A
-// quoted value that contains a pragma, YAML `key: "see # zhtw:ignore"`,
+// quoted value that contains a pragma, YAML 'key: "see # zhtw:ignore"',
 // suppresses its own line. Tracking that would mean a string lexer per content
 // type inside a scanner whose whole job is finding one token, and the failure
 // needs a document that quotes a real pragma keyword, so the limitation is
@@ -379,7 +379,7 @@ terms:
     #[test]
     fn slash_marker_needs_its_own_token() {
         // A URL scheme separator and a doubled path slash are not comment
-        // openers, however much they look like one to `ends_with`.
+        // openers, however much they look like one to ends_with.
         for text in [
             "參考 https://zhtw:ignore 的說明\n",
             "路徑 docs//zhtw:disable-block 之下\n",
